@@ -10,6 +10,8 @@ import reporting
 from config import Mode, AgentType
 from examples.election import Election
 
+from icecream import ic
+
 class Simulation:
     def __init__(self, env, agents, config, keyboard_agent):
         assert len(env.bodies) == len(agents), "each body must be assigned an agent and vice versa"
@@ -106,6 +108,9 @@ class Simulation:
 
                 for agent, action, reward in zip(self.agents, joint_action, joint_reward):
                     agent.process_feedback(previous_state, action, state, reward)
+                    # ic(agent)
+                    # ic(action)
+                    # ic(reward)
 
                 # monitor rewards and feature weights
                 ego = self.agents[0]
@@ -197,6 +202,7 @@ class Simulation:
                 plt.pause(0.01)
             count += 1
 
+
         else:
             run_end_time = timeit.default_timer()
             run_results = reporting.analyse_run(episode_data, run_start_time, run_end_time, self.config, self.env)
@@ -204,6 +210,10 @@ class Simulation:
             if self.run_file:
                 self.run_file.info(run_results.file_message())
 
-        np.savetxt('episode_rewards_{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()),self.reward_monitor,fmt='%9.3f' )
-        plt.savefig('epi_reward_{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
+        ts = datetime.datetime.now().strftime("%d-%b-%Y-%H-%M-%S")
+        plt.savefig('plots/Weights_%s.png' % ts)
+
+        # np.savetxt('episode_rewards_{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()),self.reward_monitor,fmt='%9.3f' )
+        # plt.savefig('epi_reward_{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
+        ic(ego_win_ratio)
         self.env.close()  # closes viewer rather than environment
