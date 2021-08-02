@@ -325,6 +325,15 @@ class Vehicle(DynamicBody):
     def longitudinal_lights(self):
         return self.longitudinal_lights_shape.transform(self.state.orientation, self.state.position)
 
+    def lidar(self):
+        lidar_long = geometry.make_circle_segment(400, math.pi/18, anchor=Point(self.constants.length / 2, 0),
+                                angle_left_offset=0.99).transform(self.state.orientation, self.state.position)
+        lidar_med = geometry.make_circle_segment(75, math.pi / 8, anchor=Point(self.constants.length / 2, 0),
+                                angle_left_offset=0.90).transform(self.state.orientation,self.state.position)
+        lidar_short = geometry.make_circle_segment(23, math.pi / 3, anchor=Point(self.constants.length / 2, 0),
+                                angle_left_offset=0.95).transform(self.state.orientation,self.state.position)
+        return lidar_long
+
 
 class Car(Vehicle):
     def __init__(self, init_state, constants):

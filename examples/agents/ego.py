@@ -51,8 +51,29 @@ class QLearningEgoAgent(RandomAgent):
 
         # bounds are used to normalise features
         self.feature_bounds = dict()
+
+
         self.feature_bounds["goal_distance_x"] = (0,1)
-        self.feature_bounds["distance_angle"] = (0,1)
+        # self.feature_bounds["distance_angle"] = (0,1)
+        # self.feature_bounds["ego_speed"] = (0,self.body.constants.max_velocity)
+        # self.feature_bounds["speed_heading"] = (0,1)
+        # self.feature_bounds["speed_d_angle"] = (0,1)
+        # self.feature_bounds["beam_long"] = (0,1)
+        # self.feature_bounds["beam_med"] = (0,1)
+        # self.feature_bounds["beam_short"] = (0,1)
+        # self.feature_bounds["ped_crossing"] = (0,1)
+        self.feature_bounds["beam_x_crossing"] = (0,1)
+
+
+
+
+
+
+        x_mid = M2PX * 16  # 0 < x_mid < self.x_max
+        y_mid = 0.5  # 0 < y_mid < 1
+        self.x_max = self.feature_bounds["distance"][1] if "distance" in self.feature_bounds else math.sqrt((width ** 2) + (height ** 2))
+        self.n = math.log(1 - y_mid) / math.log(x_mid / self.x_max)
+
 
         if self.feature_config.distance_x:
             self.feature_bounds["distance_x"] = (-float(width), float(width))
@@ -68,10 +89,6 @@ class QLearningEgoAgent(RandomAgent):
             self.feature_bounds["on_road"] = (0.0, 1.0)
         if self.feature_config.inverse_distance:
             self.feature_bounds["inverse_distance"] = (0.0, 4.0)
-            x_mid = M2PX * 16  # 0 < x_mid < self.x_max
-            y_mid = 0.5  # 0 < y_mid < 1
-            self.x_max = self.feature_bounds["distance"][1] if "distance" in self.feature_bounds else math.sqrt((width ** 2) + (height ** 2))
-            self.n = math.log(1 - y_mid) / math.log(x_mid / self.x_max)
 
         # set a zero weight for each feature against each opponent
         self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
@@ -104,9 +121,9 @@ class QLearningEgoAgent(RandomAgent):
                     best_actions.append(action)
             assert best_actions, "no best action(s) found"
             # if multiple best actions occur then a random is chosen
-            # action = best_actions[0] if len(best_actions) == 1 else best_actions[self.np_random.choice(range(len(best_actions)))]
-            if len(best_actions) == 1:
-                action = best_actions[0] #GC Edit
+            action = best_actions[0] if len(best_actions) == 1 else best_actions[self.np_random.choice(range(len(best_actions)))]
+            # if len(best_actions) == 1:
+            #     action = best_actions[0] #GC Edit
             # #store q-values
             self.store_q_values = q_value
             # ic(q_value)
@@ -185,6 +202,7 @@ class QLearningEgoAgent(RandomAgent):
         unnormalised_values = dict()
         unnormalised_values["goal_distance_x"] = (self.width - self_state.position.x)/self.width # GC changed to be distance from target position
 
+        # *************** distance to ped x relative angle
         # GC This should return a high value if a ped is close and in front of the ego
         dist_to_opponent = self_state.position.distance(opponent_state.position)
         inv_dist_to_opponent = 1 - (dist_to_opponent / self.x_max)
@@ -192,11 +210,43 @@ class QLearningEgoAgent(RandomAgent):
         norm_inv_dist_to_opponent = normalise(inv_dist_to_opponent, 0 , upper_bound)
         rel_ang = abs(geometry.normalise_angle(geometry.Line(start=self_state.position, end=opponent_state.position).orientation() - self_state.orientation))
         norm_rel_angle = normalise(rel_ang,0,math.pi/2)
-        distance_angle = norm_inv_dist_to_opponent * norm_rel_angle
+        distance_angle = 1.0 * norm_inv_dist_to_opponent * norm_rel_angle
         # ic(norm_inv_dist_to_opponent)
         # ic(norm_rel_angle)
         # ic(distance_angle)
-        unnormalised_values["distance_angle"] = distance_angle
+        # unnormalised_values["distance_angle"] = distance_angle
+
+        # *************** speed x distance angle
+        ego_speed = self_state.velocity
+        # unnormalised_values["ego_speed"] = ego_speed
+
+        # *************** speed x angle
+        ego_speed = self_state.velocity
+        norm_ego_speed = normalise(ego_speed, 0, 1)
+        # unnormalised_values["speed_heading"] = norm_ego_speed * norm_rel_angle
+
+
+        # *************** speed x distance_angle
+        ego_speed = self_state.velocity
+        # unnormalised_values["speed_d_angle"] = 1000 * norm_ego_speed * distance_angle
+        # ic(unnormalised_values["speed_d_angle"])
+
+        # ************** driving arc (akin to lidar beam detector)
+        radius = 256.0 # pixel units = 16/meter
+        angle = math.pi/4
+        beam_long = geometry.make_circle_segment(400, math.pi/18, anchor=Point(self.body.constants.length / 2, 0), angle_left_offset=0.99).transform(self_state.orientation,self_state.position)
+        beam_med = geometry.make_circle_segment(75, math.pi/8, anchor=Point(self.body.constants.length / 2, 0), angle_left_offset=0.90).transform(self_state.orientation, self_state.position)
+        beam_short = geometry.make_circle_segment(23, math.pi/3, anchor=Point(self.body.constants.length / 2, 0), angle_left_offset=0.95).transform(self_state.orientation, self_state.position)
+
+        # unnormalised_values["beam_long"] = 1 if (any(ped_body.bounding_box().intersects(beam_long) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["beam_med"] = 1 if (any(ped_body.bounding_box().intersects(beam_med) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["beam_short"] = 1 if (any(ped_body.bounding_box().intersects(beam_short) for ped_body in self.pedestrians)) else 0
+
+        # unnormalised_values["ped_crossing"] = 1 if (-1.6 <= opponent_state.orientation <= -1.4) else 0
+        # ic(unnormalised_values["ped_crossing"])
+        unnormalised_values["beam_x_crossing"] = 1 if ((-1.6 <= opponent_state.orientation <= -1.4) and
+               (any(ped_body.bounding_box().intersects(beam_long) for ped_body in self.pedestrians))) else 0
+
 
         if self.feature_config.distance_x:
             unnormalised_values["distance_x"] = self_state.position.distance_x(opponent_state.position)
@@ -220,6 +270,12 @@ class QLearningEgoAgent(RandomAgent):
             x = self_state.position.distance(opponent_state.position)
             unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** self.n  # thanks to Ram Varadarajan
             # ic(unnormalised_values["inverse_distance"])
+
+        # if unnormalised_values["beam_detect"]==1:
+            # ic(unnormalised_values["distance_x"])
+            # ic(unnormalised_values["distance_y"])
+            # ic(unnormalised_values["relative_angle"])
+            # ic(unnormalised_values["beam_detect"])
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
         return normalised_values
