@@ -325,14 +325,50 @@ class Vehicle(DynamicBody):
     def longitudinal_lights(self):
         return self.longitudinal_lights_shape.transform(self.state.orientation, self.state.position)
 
-    def lidar(self):
-        lidar_long = geometry.make_circle_segment(400, math.pi/18, anchor=Point(self.constants.length / 2, 0),
-                                angle_left_offset=0.99).transform(self.state.orientation, self.state.position)
-        lidar_med = geometry.make_circle_segment(75, math.pi / 8, anchor=Point(self.constants.length / 2, 0),
-                                angle_left_offset=0.90).transform(self.state.orientation,self.state.position)
-        lidar_short = geometry.make_circle_segment(23, math.pi / 3, anchor=Point(self.constants.length / 2, 0),
-                                angle_left_offset=0.95).transform(self.state.orientation,self.state.position)
-        return lidar_long
+    def lidars(self):
+        # lidar_long = geometry.make_circle_segment(432, math.pi/24, anchor=Point(self.constants.length / 2, 0),
+        #                         angle_left_offset=0.9).transform(self.state.orientation, self.state.position)
+        # lidar_q1 = geometry.make_circle_segment(300, math.pi / 24, anchor=Point(0, 0),
+        #                                          angle_left_offset=0.5).transform(self.state.orientation + math.pi / 22,
+        #                                                                           self.state.position)
+        # lidar_q2 = geometry.make_circle_segment(200, math.pi / 16, anchor=Point(0, 0),
+        #                                          angle_left_offset=0.5).transform(self.state.orientation + math.pi / 16,
+        #                                                                           self.state.position)
+        # lidar_q3 = geometry.make_circle_segment(100, math.pi / 5, anchor=Point(0, 0),
+        #                         angle_left_offset=0.5).transform(self.state.orientation + math.pi/10 ,self.state.position)
+        # lidar_side = geometry.make_circle_segment(60, math.pi-0.001, anchor=Point(0, 0),
+        #                         angle_left_offset=0.50).transform(self.state.orientation + math.pi/2,self.state.position)
+        # lidar_long = geometry.make_circle_segment(432, math.pi/24, anchor=Point(self.constants.length / 2, 0),
+        #     angle_left_offset=0.1).transform(self.state.orientation, self.state.position)
+        # lidar_q1 = geometry.make_circle_segment(300, math.pi / 24, anchor=Point(0, 0),
+        #      angle_left_offset=0.5).transform(self.state.orientation - math.pi / 22, self.state.position)
+        # lidar_q2 = geometry.make_circle_segment(200, math.pi / 16, anchor=Point(0, 0),
+        #      angle_left_offset=0.5).transform(self.state.orientation - math.pi / 16, self.state.position)
+        # lidar_q3 = geometry.make_circle_segment(100, math.pi / 5, anchor=Point(0, 0),
+        #     angle_left_offset=0.5).transform(self.state.orientation - math.pi/10 ,self.state.position)
+        # lidar_side = geometry.make_circle_segment(60, math.pi-0.001, anchor=Point(0, 0),
+        #     angle_left_offset=0.50).transform(self.state.orientation - math.pi/2,self.state.position)
+        # lidars = [lidar_side, lidar_q1, lidar_q2,  lidar_q3, lidar_long]
+        lidar_range = 450
+        lidar_width = 54
+        lidar_box_L1 = geometry.make_rectangle(self.constants.length, lidar_width).transform(self.state.orientation, geometry.Point(self.state.position.x ,self.state.position.y  + lidar_width/2))
+        lidar_box_L2 = geometry.make_rectangle(lidar_range/2, lidar_width).transform(self.state.orientation,
+               geometry.Point(self.state.position.x + self.constants.length/2 + lidar_range / 4, self.state.position.y + lidar_width / 2))
+        lidar_box_L3 = geometry.make_rectangle(lidar_range/2, lidar_width).transform(self.state.orientation,
+               geometry.Point(self.state.position.x + self.constants.length / 2 + (3*lidar_range/4) ,self.state.position.y + lidar_width / 2))
+        
+        lidar_box_R1 = geometry.make_rectangle(self.constants.length, lidar_width).transform(self.state.orientation,
+            geometry.Point(self.state.position.x,self.state.position.y - lidar_width / 2))
+        lidar_box_R2 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self.state.orientation,
+            geometry.Point(self.state.position.x + self.constants.length / 2 + lidar_range / 4,self.state.position.y - lidar_width / 2))
+        lidar_box_R3 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self.state.orientation,
+            geometry.Point(self.state.position.x + self.constants.length / 2 + (3 * lidar_range / 4),self.state.position.y - lidar_width / 2))
+            
+        lidar_box_R = geometry.make_rectangle(lidar_range, lidar_width).transform(self.state.orientation,geometry.Point(self.state.position.x -
+               self.constants.length / 2 + lidar_range / 2, self.state.position.y - lidar_width / 2))
+        lidars = [lidar_box_R1, lidar_box_L2, lidar_box_R3]
+        return lidars
+
 
 
 class Car(Vehicle):

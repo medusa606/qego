@@ -117,11 +117,12 @@ class VehicleView(DynamicBodyView):
         self.reaction = rendering.make_polygon(list(reaction_zone) if reaction_zone else list(), filled=False)
         self.reaction.set_color(*RGB.GREEN.value)
 
-        lidar = vehicle.lidar()
-        self.lidar = rendering.make_polygon(list(lidar) if lidar else list())
+        lidar = vehicle.lidars()
+        # self.lidar = rendering.make_polygon(list(lidar) if lidar else list())
+        self.lidars = [rendering.make_polygon(list(lidar) if lidar else list()) for lidar in vehicle.lidars()]
         # self.lidar.set_color(*RGB.GREEN.value)
         # self.lidar.set_color(*RGB.YELLOW.value)
-        self.lidar.set_color(*RGB.RED.value)
+        # self.lidar.set_color(*RGB.RED.value)
 
         self.scale = {
             BulbState.OFF: 0.0,
@@ -150,8 +151,10 @@ class VehicleView(DynamicBodyView):
     def update(self, vehicle, ego):
         super().update(vehicle, ego)
 
-        lidar = vehicle.lidar()
-        self.lidar.v = list(lidar) if lidar else list()
+        # lidar = vehicle.lidar()
+        # self.lidar.v = list(lidar) if lidar else list()
+        for render_lidar, vehicle_lidar in zip(self.lidars, vehicle.lidars()):
+            render_lidar.v = list(vehicle_lidar) if vehicle_lidar else list()
 
         braking_zone, reaction_zone = vehicle.stopping_zones()
         self.braking.v = list(braking_zone) if braking_zone else list()
@@ -184,7 +187,7 @@ class VehicleView(DynamicBodyView):
     def geoms(self):
         yield from [self.braking, self.reaction]
         yield from super().geoms()
-        yield self.lidar
+        yield from self.lidars
 
 
 class CarView(VehicleView):

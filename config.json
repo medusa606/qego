@@ -10,7 +10,7 @@
   "terminate_ego_offroad": false,
   "reward_win": 6000.0,
   "reward_draw": 2000.0,
-  "cost_step": 4.0,
+  "cost_step": 0.4,
   "scenario_config": {
     "option": "pedestrians",
     "num_pedestrians": 1,
@@ -21,19 +21,20 @@
   "ego_config": {
     "option": "q-learning",
     "alpha":{
-      "start": 0.8,
-      "stop": 0.1,
+      "start": 0.0008,
+      "stop": 0.0001,
       "num_steps": 10000 },
     "gamma": 0.5,
-    "epsilon": 0.2,
+    "epsilon": 0.0,
     "feature_config": {
-      "distance_x": true,
-      "distance_y": true,
-      "distance": true,
-      "relative_angle": true,
-      "heading": true,
-      "on_road": true,
-      "inverse_distance": false},
+      "distance_x": false,
+      "distance_y": false,
+      "distance": false,
+      "relative_angle": false,
+      "heading": false,
+      "on_road": false,
+      "inverse_distance": false
+    },
     "log": null },
 
   "tester_config": {

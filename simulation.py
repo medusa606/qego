@@ -194,11 +194,18 @@ class Simulation:
 
                 left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
                 score_subplot=True
+                action_subplot=False
                 if score_subplot:
                     ax2 = fig.add_axes([left, bottom, width, height])
                     ax2.plot(self.ego_win_rate, color='green')
                     ax2.set_xlabel('win ratio')
                     ax2.set_xticks([])
+                if action_subplot:
+                    ax2 = fig.add_axes([left, bottom, width, height])
+                    ax2.hist(ego.store_action, color='green')
+                    ax2.set_xlabel('throttle choice')
+                    ax2.set_xticks([])
+                    ax2.set_yticks([])
                 plt.pause(0.01)
             count += 1
 

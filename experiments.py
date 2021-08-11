@@ -61,7 +61,7 @@ def make_config(tester_type, alpha, gamma, epsilon):
             gamma=gamma,
             epsilon=epsilon,
             features=FeatureConfig(
-                distance_x=False,
+                distance_x=True,
                 distance_y=False,
                 distance=True,
                 relative_angle=True,
@@ -110,7 +110,8 @@ class PoolParser(ArgumentParser):
 
 
 if __name__ == '__main__':
-    tester_types = [AgentType.RANDOM, AgentType.RANDOM_CONSTRAINED, AgentType.PROXIMITY]
+    # tester_types = [AgentType.RANDOM, AgentType.RANDOM_CONSTRAINED, AgentType.PROXIMITY]
+    tester_types = [AgentType.RANDOM_CONSTRAINED]
     alphas = [0.1, 0.5, 0.9]
     gammas = [0.1, 0.5, 0.9]
     epsilons = [0.1, 0.5, 0.9]

@@ -58,16 +58,33 @@ class QLearningEgoAgent(RandomAgent):
         # self.feature_bounds["ego_speed"] = (0,self.body.constants.max_velocity)
         # self.feature_bounds["speed_heading"] = (0,1)
         # self.feature_bounds["speed_d_angle"] = (0,1)
-        # self.feature_bounds["beam_long"] = (0,1)
+
+        # self.feature_bounds["beam_long_L"] = (0,1)
+        # self.feature_bounds["beam_long_R"] = (0,1)
         # self.feature_bounds["beam_med"] = (0,1)
         # self.feature_bounds["beam_short"] = (0,1)
         # self.feature_bounds["ped_crossing"] = (0,1)
-        self.feature_bounds["beam_x_crossing"] = (0,1)
+        # self.feature_bounds["beam_x_crossing"] = (0,1)
 
+        # self.feature_bounds["lidar_left"] = (0,1)
+        # self.feature_bounds["lidar_right"] = (0, 1)
 
+        # self.feature_bounds["lidar_box_L1"] = (0,1)
+        self.feature_bounds["lidar_box_L2"] = (0,1)
+        # self.feature_bounds["lidar_box_L3"] = (0,1)
+        # self.feature_bounds["lidar_box_R1"] = (0, 1)
+        # self.feature_bounds["lidar_box_R2"] = (0, 1)
+        # self.feature_bounds["lidar_box_R3"] = (0, 1)
+        #
+        # self.feature_bounds["pedx_lidar_L1"] = (0, 1)
+        self.feature_bounds["pedx_lidar_L2"] = (0, 1)
+        # self.feature_bounds["pedx_lidar_L3"] = (0, 1)
+        # self.feature_bounds["pedx_lidar_R1"] = (0, 1)
+        # self.feature_bounds["pedx_lidar_R2"] = (0, 1)
+        # self.feature_bounds["pedx_lidar_R3"] = (0, 1)
 
-
-
+        # self.feature_bounds["speed_lidarL"] = (0, 1)
+        # self.feature_bounds["speed_lidarR"] = (0, 1)
 
         x_mid = M2PX * 16  # 0 < x_mid < self.x_max
         y_mid = 0.5  # 0 < y_mid < 1
@@ -94,8 +111,9 @@ class QLearningEgoAgent(RandomAgent):
         self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
         # ic(self.feature_weights)
 
-        #store the q-values for monitoring
+        #store the q-values and actions for monitoring
         self.store_q_values = []
+        self.store_action = []
 
         # create a set of features for each opponent (pedestrian)
         self.enabled_features = {index: sorted(self.feature_bounds.keys()) for index in self.opponent_indexes}
@@ -126,9 +144,9 @@ class QLearningEgoAgent(RandomAgent):
             #     action = best_actions[0] #GC Edit
             # #store q-values
             self.store_q_values = q_value
-            # ic(q_value)
-            # ic(action)
-
+            self.store_action.append(action[0]) #store ego action history
+            # if action[0] == (-144 or -72):
+            #     ic(action[0])
         return action
 
     def process_feedback(self, previous_state, action, state, reward):
@@ -180,7 +198,7 @@ class QLearningEgoAgent(RandomAgent):
 
         # *****************************
         # KEVIN: need to understand this better, when n=1 we jump to very high accuracies!
-        def n_step_lookahead(body_state, throttle, n=2):
+        def n_step_lookahead(body_state, throttle, n=50):
             next_body_state = body_state
             for _ in range(n):
                 next_body_state = one_step_lookahead(next_body_state, throttle)
@@ -200,6 +218,7 @@ class QLearningEgoAgent(RandomAgent):
                 return (value - min_bound) / (max_bound - min_bound)
 
         unnormalised_values = dict()
+        # unnormalised_values["goal_distance_x"] = (self_state.position.x)/self.width # GC changed to be distance from target position
         unnormalised_values["goal_distance_x"] = (self.width - self_state.position.x)/self.width # GC changed to be distance from target position
 
         # *************** distance to ped x relative angle
@@ -218,11 +237,13 @@ class QLearningEgoAgent(RandomAgent):
 
         # *************** speed x distance angle
         ego_speed = self_state.velocity
+        # ic(ego_speed)
         # unnormalised_values["ego_speed"] = ego_speed
 
         # *************** speed x angle
         ego_speed = self_state.velocity
-        norm_ego_speed = normalise(ego_speed, 0, 1)
+        norm_ego_speed = normalise(ego_speed, 0, 144)
+        # ic(norm_ego_speed)
         # unnormalised_values["speed_heading"] = norm_ego_speed * norm_rel_angle
 
 
@@ -231,21 +252,110 @@ class QLearningEgoAgent(RandomAgent):
         # unnormalised_values["speed_d_angle"] = 1000 * norm_ego_speed * distance_angle
         # ic(unnormalised_values["speed_d_angle"])
 
-        # ************** driving arc (akin to lidar beam detector)
-        radius = 256.0 # pixel units = 16/meter
-        angle = math.pi/4
-        beam_long = geometry.make_circle_segment(400, math.pi/18, anchor=Point(self.body.constants.length / 2, 0), angle_left_offset=0.99).transform(self_state.orientation,self_state.position)
-        beam_med = geometry.make_circle_segment(75, math.pi/8, anchor=Point(self.body.constants.length / 2, 0), angle_left_offset=0.90).transform(self_state.orientation, self_state.position)
-        beam_short = geometry.make_circle_segment(23, math.pi/3, anchor=Point(self.body.constants.length / 2, 0), angle_left_offset=0.95).transform(self_state.orientation, self_state.position)
+        # ************** driving lidar LEFT
+        # lidar_long = geometry.make_circle_segment(432, math.pi / 24, anchor=Point(self.body.constants.length / 2, 0),
+        #           angle_left_offset=0.9).transform(self_state.orientation,self_state.position)
+        # lidar_q1 = geometry.make_circle_segment(300, math.pi / 24, anchor=Point(0, 0),
+        #             angle_left_offset=0.5).transform(self_state.orientation + math.pi / 22,self_state.position)
+        # lidar_q2 = geometry.make_circle_segment(200, math.pi / 16, anchor=Point(0, 0),
+        #             angle_left_offset=0.5).transform(self_state.orientation + math.pi / 16,self_state.position)
+        # lidar_q3 = geometry.make_circle_segment(100, math.pi / 5, anchor=Point(0, 0),
+        #             angle_left_offset=0.5).transform(self_state.orientation + math.pi / 10, self_state.position)
+        # lidar_side = geometry.make_circle_segment(60, math.pi - 0.001, anchor=Point(0, 0),
+        #           angle_left_offset=0.50).transform(self_state.orientation + math.pi / 2, self_state.position)
 
-        # unnormalised_values["beam_long"] = 1 if (any(ped_body.bounding_box().intersects(beam_long) for ped_body in self.pedestrians)) else 0
-        # unnormalised_values["beam_med"] = 1 if (any(ped_body.bounding_box().intersects(beam_med) for ped_body in self.pedestrians)) else 0
-        # unnormalised_values["beam_short"] = 1 if (any(ped_body.bounding_box().intersects(beam_short) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_long"] = 1 if (any(ped_body.bounding_box().intersects(lidar_long) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_q1"] = 1 if (any(ped_body.bounding_box().intersects(lidar_q1) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_q2"] = 1 if (any(ped_body.bounding_box().intersects(lidar_q2) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_q3"] = 1 if (any(ped_body.bounding_box().intersects(lidar_q3) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_side"] = 1 if (any(ped_body.bounding_box().intersects(lidar_side) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_left"] = 1 if (
+        #             any(ped_body.bounding_box().intersects(lidar_long) for ped_body in self.pedestrians)
+        #             or any(ped_body.bounding_box().intersects(lidar_q1) for ped_body in self.pedestrians)
+        #             or any(ped_body.bounding_box().intersects(lidar_q2) for ped_body in self.pedestrians)
+        #             or any(ped_body.bounding_box().intersects(lidar_q3) for ped_body in self.pedestrians)
+        #             or any(ped_body.bounding_box().intersects(lidar_side) for ped_body in self.pedestrians)) else 0
+        # ic(unnormalised_values["lidar_long"])
+        # ic(unnormalised_values["lidar_q1"])
+        # ic(unnormalised_values["lidar_q2"])
+        # ic(unnormalised_values["lidar_q3"])
+        # ic(unnormalised_values["lidar_side"])
+
+        # ************** driving lidar RIGHT
+        # lidar_longL = geometry.make_circle_segment(432, math.pi / 24, anchor=Point(self.body.constants.length / 2, 0),
+        #           angle_left_offset=0.1).transform(self_state.orientation,self_state.position)
+        # lidar_q1L = geometry.make_circle_segment(300, math.pi / 24, anchor=Point(0, 0),
+        #             angle_left_offset=0.5).transform(self_state.orientation - math.pi / 22,self_state.position)
+        # lidar_q2L = geometry.make_circle_segment(200, math.pi / 16, anchor=Point(0, 0),
+        #             angle_left_offset=0.5).transform(self_state.orientation - math.pi / 16,self_state.position)
+        # lidar_q3L = geometry.make_circle_segment(100, math.pi / 5, anchor=Point(0, 0),
+        #             angle_left_offset=0.5).transform(self_state.orientation - math.pi / 10, self_state.position)
+        # lidar_sideL = geometry.make_circle_segment(60, math.pi - 0.001, anchor=Point(0, 0),
+        #           angle_left_offset=0.50).transform(self_state.orientation - math.pi / 2, self_state.position)
+
+        # unnormalised_values["lidar_right"] = 1 if (any(ped_body.bounding_box().intersects(lidar_longL) for ped_body in self.pedestrians)
+        #            or any(ped_body.bounding_box().intersects(lidar_q1L) for ped_body in self.pedestrians)
+        #            or any(ped_body.bounding_box().intersects(lidar_q2L) for ped_body in self.pedestrians)
+        #            or any(ped_body.bounding_box().intersects(lidar_q3L) for ped_body in self.pedestrians)
+        #            or any(ped_body.bounding_box().intersects(lidar_sideL) for ped_body in self.pedestrians)) else 0
+        # # ic(unnormalised_values["lidar_right"])
+
+        # unnormalised_values["speed_lidarL"] = norm_ego_speed * unnormalised_values["lidar_left"]
+        # unnormalised_values["speed_lidarR"] = norm_ego_speed * unnormalised_values["lidar_right"]
+        # ic(unnormalised_values["speed_lidarL"])
+        # ic(unnormalised_values["speed_lidarR"])
+        lidar_range = 500
+        lidar_width = 54
+        # lidar_box_L = geometry.make_rectangle(lidar_range, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x -self.body.constants.length / 2 + lidar_range / 2,
+        #              self_state.position.y + lidar_width / 2))
+        # lidar_box_R = geometry.make_rectangle(lidar_range, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x - self.body.constants.length / 2 + lidar_range / 2,
+        #     self_state.position.y - lidar_width / 2))
+
+        # ************** box lidar split into 3 sections
+        # lidar_box_L1 = geometry.make_rectangle(self.body.constants.length, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x,self_state.position.y + lidar_width / 2))
+        lidar_box_L2 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self_state.orientation,
+            geometry.Point(self_state.position.x + self.body.constants.length / 2 + lidar_range / 4,self_state.position.y + lidar_width / 2))
+        # lidar_box_L3 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x + self.body.constants.length / 2 + (3 * lidar_range / 4),self_state.position.y + lidar_width / 2))
+
+        L2 = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L2) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_box_L1"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L1) for ped_body in self.pedestrians)) else 0
+        unnormalised_values["lidar_box_L2"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L2) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_box_L3"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L3) for ped_body in self.pedestrians)) else 0
+        # lidar_box_R1 = geometry.make_rectangle(self.body.constants.length, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x,self_state.position.y - lidar_width / 2))
+        # lidar_box_R2 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x + self.body.constants.length / 2 + lidar_range / 4,self_state.position.y - lidar_width / 2))
+        # lidar_box_R3 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x + self.body.constants.length / 2 + (3 * lidar_range / 4),self_state.position.y - lidar_width / 2))
+        # R2 = 1 if (any(ped_body.bounding_box().intersects(lidar_box_R2) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_box_R1"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_R1) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_box_R2"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_R2) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_box_R3"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_R3) for ped_body in self.pedestrians)) else 0
+
+        # ************** ped orientation
+        ped_xdown = 1 if (-1.6 <= opponent_state.orientation <= -1.4) else 0
+        ped_xup = 1 if (1.6 <= opponent_state.orientation <= 1.4) else 0
+        # ************** opponent orientation & lidar_detection
+        # unnormalised_values["pedx_lidar_L1"] = 1 if (unnormalised_values["lidar_box_L1"] == 1 and ped_xdown == 1) else 0
+        unnormalised_values["pedx_lidar_L2"] = 1 if (L2 == 1 and ped_xdown == 1) else 0
+        # unnormalised_values["pedx_lidar_L3"] = 1 if (unnormalised_values["lidar_box_L3"] == 1 and ped_xdown == 1) else 0
+        # unnormalised_values["pedx_lidar_R1"] = 1 if (unnormalised_values["lidar_box_R1"] == 1 and ped_xup == 1) else 0
+        # unnormalised_values["pedx_lidar_R2"] = 1 if (R2 == 1 and ped_xup == 1) else 0
+        # unnormalised_values["pedx_lidar_R3"] = 1 if (unnormalised_values["lidar_box_R3"] == 1 and ped_xup == 1) else 0
+
+
+        # if unnormalised_values["pedx_lidar_L2"]==1:
+        #     ic(unnormalised_values["pedx_lidar_L2"])
 
         # unnormalised_values["ped_crossing"] = 1 if (-1.6 <= opponent_state.orientation <= -1.4) else 0
         # ic(unnormalised_values["ped_crossing"])
-        unnormalised_values["beam_x_crossing"] = 1 if ((-1.6 <= opponent_state.orientation <= -1.4) and
-               (any(ped_body.bounding_box().intersects(beam_long) for ped_body in self.pedestrians))) else 0
+        # unnormalised_values["beam_x_crossing"] = 1 if ((-1.6 <= opponent_state.orientation <= -1.4) and
+        #        (any(ped_body.bounding_box().intersects(lidar_left) for ped_body in self.pedestrians))) else 0
+        # ic(unnormalised_values["beam_x_crossing"])
 
 
         if self.feature_config.distance_x:

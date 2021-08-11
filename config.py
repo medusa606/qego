@@ -317,7 +317,7 @@ class Config:
                 time_resolution=env.time_resolution,
                 width=env.constants.viewer_width,
                 height=env.constants.viewer_height,
-                num_actions=5,
+                num_actions=5, #originally 5
                 num_opponents=len(env.bodies)-1,
                 road_polgon=env.constants.road_map.major_road.static_bounding_box, # GC added
                 pedestrians=[body for body in env.bodies[1:] if isinstance(body, Pedestrian)]
