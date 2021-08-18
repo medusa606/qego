@@ -77,7 +77,7 @@ class QLearningEgoAgent(RandomAgent):
         # self.feature_bounds["lidar_box_R3"] = (0, 1)
         #
         # self.feature_bounds["pedx_lidar_L1"] = (0, 1)
-        self.feature_bounds["pedx_lidar_L2"] = (0, 1)
+        # self.feature_bounds["pedx_lidar_L2"] = (0, 1)
         # self.feature_bounds["pedx_lidar_L3"] = (0, 1)
         # self.feature_bounds["pedx_lidar_R1"] = (0, 1)
         # self.feature_bounds["pedx_lidar_R2"] = (0, 1)
@@ -197,7 +197,6 @@ class QLearningEgoAgent(RandomAgent):
             )
 
         # *****************************
-        # KEVIN: need to understand this better, when n=1 we jump to very high accuracies!
         def n_step_lookahead(body_state, throttle, n=50):
             next_body_state = body_state
             for _ in range(n):
@@ -337,11 +336,11 @@ class QLearningEgoAgent(RandomAgent):
         # unnormalised_values["lidar_box_R3"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_R3) for ped_body in self.pedestrians)) else 0
 
         # ************** ped orientation
-        ped_xdown = 1 if (-1.6 <= opponent_state.orientation <= -1.4) else 0
-        ped_xup = 1 if (1.6 <= opponent_state.orientation <= 1.4) else 0
+        # ped_xdown = 1 if (-1.6 <= opponent_state.orientation <= -1.4) else 0
+        # ped_xup = 1 if (1.6 <= opponent_state.orientation <= 1.4) else 0
         # ************** opponent orientation & lidar_detection
         # unnormalised_values["pedx_lidar_L1"] = 1 if (unnormalised_values["lidar_box_L1"] == 1 and ped_xdown == 1) else 0
-        unnormalised_values["pedx_lidar_L2"] = 1 if (L2 == 1 and ped_xdown == 1) else 0
+        # unnormalised_values["pedx_lidar_L2"] = 1 if (L2 == 1 and ped_xdown == 1) else 0
         # unnormalised_values["pedx_lidar_L3"] = 1 if (unnormalised_values["lidar_box_L3"] == 1 and ped_xdown == 1) else 0
         # unnormalised_values["pedx_lidar_R1"] = 1 if (unnormalised_values["lidar_box_R1"] == 1 and ped_xup == 1) else 0
         # unnormalised_values["pedx_lidar_R2"] = 1 if (R2 == 1 and ped_xup == 1) else 0
@@ -356,6 +355,21 @@ class QLearningEgoAgent(RandomAgent):
         # unnormalised_values["beam_x_crossing"] = 1 if ((-1.6 <= opponent_state.orientation <= -1.4) and
         #        (any(ped_body.bounding_box().intersects(lidar_left) for ped_body in self.pedestrians))) else 0
         # ic(unnormalised_values["beam_x_crossing"])
+
+
+        # ************** time-to-collision
+        ttc=True
+        if(ttc):
+            #choose the closest pedestrian TODO we only have one so use[0]
+            # pb = self.pedestrians[0].constants
+            # length = 10.5, width = 14.0, wheelbase = 5.25, track = 14.0, min_velocity = 0, max_velocity = 22.4, min_throttle = -22.4, max_throttle = 22.4, min_steering_angle = -1.2566370614359172, max_steering_angle = 1.2566370614359172
+
+            ped_time_to_road = (opponent_state.position.y - self_state.position.y)/ opponent_state.velocity
+            # ego_time_to_ped = self_state.position.distance_x(opponent_state.position.x) #/ self_state.velocity
+            ic(ped_time_to_road)
+            # ic(ego_time_to_ped)
+
+
 
 
         if self.feature_config.distance_x:
