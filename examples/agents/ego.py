@@ -370,22 +370,38 @@ class QLearningEgoAgent(RandomAgent):
             reaction_distance = self_state.velocity * 0.675
             stopping_distance = braking_distance + reaction_distance
 
-            time_ped_to_road = (opponent_state.position.y - self_state.position.y) / opponent_state.velocity if self_state.velocity > 0 else (opponent_state.position.y - self_state.position.y) / 0.1
-            #TODO add hald car length
-            time_ego_to_ped =  (opponent_state.position.x + stopping_distance - self_state.position.x) / self_state.velocity if self_state.velocity > 0 else (opponent_state.position.x + stopping_distance - self_state.position.x) / 0.1
+            time_ped_to_road = (opponent_state.position.y - self_state.position.y) / opponent_state.velocity if opponent_state.velocity > 0 else (opponent_state.position.y - self_state.position.y) / 0.1
+            time_ego_to_ped =  (opponent_state.position.x
+                                - stopping_distance
+                                - self.body.constants.length/2
+                                - self_state.position.x) / self_state.velocity if self_state.velocity > 0 \
+                else (opponent_state.position.x + stopping_distance - self_state.position.x) / 0.1
 
             delta = (self.body.constants.width / 2) / opponent_state.velocity if opponent_state.velocity > 0 else (self.body.constants.width / 2) / 0.1
-            #TODO add L/2 here
-            in_front = (opponent_state.position.x - self_state.position.x - stopping_distance) > 0
-            # might want to add additional time to account from braking time
-            safety_time = abs(time_ego_to_ped) - delta - abs(time_ped_to_road) if in_front else -1
-            safety_binary = 0 if (safety_time <= 0 and in_front) else 1
-            # ic(time_ped_to_road)
-            # ic(time_ego_to_ped)
-            # ic(self_state.velocity) #velocity jumps between values quickly resulting in unstable safety_time
-            # ic(safety_time)
+
+            # ********* Safe to pass IN FRONT
+            in_front = (opponent_state.position.x
+                        - self.body.constants.length/2
+                        - self_state.position.x
+                        - stopping_distance) > 0
+            safety_time = abs(time_ego_to_ped) - delta - abs(time_ped_to_road) #if in_front else -1 #this one makes little difference
+            safety_binary = 0 if (safety_time <= 0 and in_front) else 1 #this one makes big difference
+
+            #************* SAFE TO PASS BEHIND
+            # time_ped_safe = (py - ey - w / 2) / vp
+            safe_y = (opponent_state.position.y - self_state.position.y - self.body.constants.width / 2)
+            time_ped_safe = safe_y / opponent_state.velocity if opponent_state.velocity > 0 else safe_y / 0.1
+            # time_ego_safe = (px - ex + L/2) / ve
+            safe_x = (opponent_state.position.x - self_state.position.x + self.body.constants.length/2)
+            time_ego_safe = safe_x / self_state.velocity if self_state.velocity > 0 else safe_x / 0.1
+
+            safety_pass_time = abs(time_ped_safe) - time_ego_safe
+            not_safe_pass_behind = 1 if (safety_pass_time < 0) else 0
+
+            # safety_binary = safety_binary & safe_pass_behind
             # ic(safety_binary)
-            # self.store_safety_time.append(safety_time)
+            ic(safe_pass_behind)
+
             unnormalised_values["safety_binary"] = safety_binary
             # unnormalised_values["safety_time"] = safety_time
 
