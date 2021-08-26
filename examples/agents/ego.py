@@ -52,6 +52,8 @@ class QLearningEgoAgent(RandomAgent):
         # bounds are used to normalise features
         self.feature_bounds = dict()
 
+        self.feature_bounds["safety_binary"] = (0,1)
+        # self.feature_bounds["safety_time"] = (0, 1)
 
         self.feature_bounds["goal_distance_x"] = (0,1)
         # self.feature_bounds["distance_angle"] = (0,1)
@@ -70,7 +72,7 @@ class QLearningEgoAgent(RandomAgent):
         # self.feature_bounds["lidar_right"] = (0, 1)
 
         # self.feature_bounds["lidar_box_L1"] = (0,1)
-        self.feature_bounds["lidar_box_L2"] = (0,1)
+        # self.feature_bounds["lidar_box_L2"] = (0,1)
         # self.feature_bounds["lidar_box_L3"] = (0,1)
         # self.feature_bounds["lidar_box_R1"] = (0, 1)
         # self.feature_bounds["lidar_box_R2"] = (0, 1)
@@ -114,6 +116,7 @@ class QLearningEgoAgent(RandomAgent):
         #store the q-values and actions for monitoring
         self.store_q_values = []
         self.store_action = []
+        self.store_safety_time = []
 
         # create a set of features for each opponent (pedestrian)
         self.enabled_features = {index: sorted(self.feature_bounds.keys()) for index in self.opponent_indexes}
@@ -158,7 +161,7 @@ class QLearningEgoAgent(RandomAgent):
                 # distance = 3.5
                 # relative angle = 9.5
                 # self.feature_weights[index][feature] = 10
-                # ic(self.feature_weights)
+                # ic(self.feature_weights[1]['safety_time'])
 
         if self.log_file:
             weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
@@ -315,14 +318,14 @@ class QLearningEgoAgent(RandomAgent):
         # ************** box lidar split into 3 sections
         # lidar_box_L1 = geometry.make_rectangle(self.body.constants.length, lidar_width).transform(self_state.orientation,
         #     geometry.Point(self_state.position.x,self_state.position.y + lidar_width / 2))
-        lidar_box_L2 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self_state.orientation,
-            geometry.Point(self_state.position.x + self.body.constants.length / 2 + lidar_range / 4,self_state.position.y + lidar_width / 2))
+        # lidar_box_L2 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self_state.orientation,
+        #     geometry.Point(self_state.position.x + self.body.constants.length / 2 + lidar_range / 4,self_state.position.y + lidar_width / 2))
         # lidar_box_L3 = geometry.make_rectangle(lidar_range / 2, lidar_width).transform(self_state.orientation,
         #     geometry.Point(self_state.position.x + self.body.constants.length / 2 + (3 * lidar_range / 4),self_state.position.y + lidar_width / 2))
 
-        L2 = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L2) for ped_body in self.pedestrians)) else 0
+        # L2 = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L2) for ped_body in self.pedestrians)) else 0
         # unnormalised_values["lidar_box_L1"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L1) for ped_body in self.pedestrians)) else 0
-        unnormalised_values["lidar_box_L2"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L2) for ped_body in self.pedestrians)) else 0
+        # unnormalised_values["lidar_box_L2"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L2) for ped_body in self.pedestrians)) else 0
         # unnormalised_values["lidar_box_L3"] = 1 if (any(ped_body.bounding_box().intersects(lidar_box_L3) for ped_body in self.pedestrians)) else 0
         # lidar_box_R1 = geometry.make_rectangle(self.body.constants.length, lidar_width).transform(self_state.orientation,
         #     geometry.Point(self_state.position.x,self_state.position.y - lidar_width / 2))
@@ -363,13 +366,28 @@ class QLearningEgoAgent(RandomAgent):
             #choose the closest pedestrian TODO we only have one so use[0]
             # pb = self.pedestrians[0].constants
             # length = 10.5, width = 14.0, wheelbase = 5.25, track = 14.0, min_velocity = 0, max_velocity = 22.4, min_throttle = -22.4, max_throttle = 22.4, min_steering_angle = -1.2566370614359172, max_steering_angle = 1.2566370614359172
+            braking_distance = (self_state.velocity**2)/(2*-self.body.constants.min_throttle)
+            reaction_distance = self_state.velocity * 0.675
+            stopping_distance = braking_distance + reaction_distance
 
-            ped_time_to_road = (opponent_state.position.y - self_state.position.y)/ opponent_state.velocity
-            # ego_time_to_ped = self_state.position.distance_x(opponent_state.position.x) #/ self_state.velocity
-            ic(ped_time_to_road)
-            # ic(ego_time_to_ped)
+            time_ped_to_road = (opponent_state.position.y - self_state.position.y) / opponent_state.velocity if self_state.velocity > 0 else (opponent_state.position.y - self_state.position.y) / 0.1
+            #TODO add hald car length
+            time_ego_to_ped =  (opponent_state.position.x + stopping_distance - self_state.position.x) / self_state.velocity if self_state.velocity > 0 else (opponent_state.position.x + stopping_distance - self_state.position.x) / 0.1
 
-
+            delta = (self.body.constants.width / 2) / opponent_state.velocity if opponent_state.velocity > 0 else (self.body.constants.width / 2) / 0.1
+            #TODO add L/2 here
+            in_front = (opponent_state.position.x - self_state.position.x - stopping_distance) > 0
+            # might want to add additional time to account from braking time
+            safety_time = abs(time_ego_to_ped) - delta - abs(time_ped_to_road) if in_front else -1
+            safety_binary = 0 if (safety_time <= 0 and in_front) else 1
+            # ic(time_ped_to_road)
+            # ic(time_ego_to_ped)
+            # ic(self_state.velocity) #velocity jumps between values quickly resulting in unstable safety_time
+            # ic(safety_time)
+            # ic(safety_binary)
+            # self.store_safety_time.append(safety_time)
+            unnormalised_values["safety_binary"] = safety_binary
+            # unnormalised_values["safety_time"] = safety_time
 
 
         if self.feature_config.distance_x:
