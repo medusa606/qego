@@ -45,6 +45,7 @@
         "terminate_ego_zones": { "type": "boolean" },
         "terminate_ego_offroad": { "type": "boolean" },
         "reward_win": { "type": "number" },
+        "reward_stay_on_road": { "type": "number" },
         "reward_draw": { "type": "number" },
         "cost_step": { "type": "number" },
         "scenario_config": {

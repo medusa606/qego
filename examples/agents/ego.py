@@ -40,7 +40,12 @@ class QLearningEgoAgent(RandomAgent):
 
         self.opponent_indexes = list(range(1, num_opponents + 1)) # list of the pedestrians
 
-        self.available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
+        # for just speed control use:
+        # self.available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
+        #for speed and steering control use:
+        self.available_actions = [[throttle_action, steering_action] for throttle_action in np.linspace(start=self.body.constants.min_throttle,
+            stop=self.body.constants.max_throttle, num=num_actions, endpoint=True) for steering_action in np.linspace(start=self.body.constants.min_steering_angle,
+            stop=self.body.constants.max_steering_angle,num=num_actions, endpoint=True)]
 
         self.log_file = None
         if q_learning_config.log is not None:
@@ -52,8 +57,12 @@ class QLearningEgoAgent(RandomAgent):
         # bounds are used to normalise features
         self.feature_bounds = dict()
 
+        self.feature_bounds["lane_position"] = (0,1)
+
         self.feature_bounds["safety_binary"] = (0,1)
+        # self.feature_bounds["safety_time"] = (0,1)
         self.feature_bounds["safe_pass_behind"] = (0, 1)
+        # self.feature_bounds["safety_pass_time"] = (0, 1)
 
         self.feature_bounds["goal_distance_x"] = (0,1)
         # self.feature_bounds["distance_angle"] = (0,1)
@@ -369,11 +378,13 @@ class QLearningEgoAgent(RandomAgent):
             braking_distance = (self_state.velocity**2)/(2*-self.body.constants.min_throttle)
             reaction_distance = self_state.velocity * 0.675
             stopping_distance = braking_distance + reaction_distance
+            ped_width = 0.50
 
             time_ped_to_road = (opponent_state.position.y - self_state.position.y) / opponent_state.velocity if opponent_state.velocity > 0 else (opponent_state.position.y - self_state.position.y) / 0.1
             time_ego_to_ped =  (opponent_state.position.x
                                 - stopping_distance
-                                - self.body.constants.length/2
+                                - self.body.constants.length/2 # half length of vehicle
+                                - ped_width                           # width of the pedestrian
                                 - self_state.position.x) / self_state.velocity if self_state.velocity > 0 \
                 else (opponent_state.position.x + stopping_distance - self_state.position.x) / 0.1
 
@@ -383,18 +394,26 @@ class QLearningEgoAgent(RandomAgent):
             in_front = (opponent_state.position.x
                         - self.body.constants.length/2
                         - self_state.position.x
+                        + ped_width # width of the ped
                         - stopping_distance) > 0
             safety_time = abs(time_ego_to_ped) - delta - abs(time_ped_to_road) #if in_front else -1 #this one makes little difference
             safety_binary = 0 if (safety_time <= 0 and in_front) else 1 #this one makes big difference
 
             unnormalised_values["safety_binary"] = safety_binary
+            # unnormalised_values["safety_time"] = safety_time
 
             #************* SAFE TO PASS BEHIND
             # time_ped_safe = (py - ey - w / 2) / vp
-            safe_y = (opponent_state.position.y - self_state.position.y - self.body.constants.width / 2)
+            safe_y = (opponent_state.position.y
+                      - self_state.position.y -
+                      self.body.constants.width / 2
+                      - ped_width)
             time_ped_safe = safe_y / opponent_state.velocity if opponent_state.velocity > 0 else safe_y / 0.1
             # time_ego_safe = (px - ex + L/2) / ve
-            safe_x = (opponent_state.position.x - self_state.position.x + self.body.constants.length/2)
+            safe_x = (opponent_state.position.x
+                      - self_state.position.x
+                      + self.body.constants.length/2
+                      + ped_width)
             time_ego_safe = safe_x / self_state.velocity if self_state.velocity > 0 else safe_x / 0.1
 
             safety_pass_time = abs(time_ped_safe) - time_ego_safe
@@ -408,7 +427,12 @@ class QLearningEgoAgent(RandomAgent):
             # ic(safety_pass_time)
             # ic(safe_pass_behind)
             unnormalised_values["safe_pass_behind"] = safe_pass_behind
+            # unnormalised_values["safety_pass_time"] = safety_pass_time
 
+        lane_position = True
+        if(lane_position):
+            lane_center_y = 29.2
+            unnormalised_values["lane_position"] = 1 - abs(self_state.position.y - opponent_state.position.y)
 
         if self.feature_config.distance_x:
             unnormalised_values["distance_x"] = self_state.position.distance_x(opponent_state.position)

@@ -255,6 +255,7 @@ class Config:
     terminate_ego_offroad: bool
     reward_win: float
     reward_draw: float
+    reward_stay_on_road: float
     cost_step: float
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
     ego_config: Union[NoopConfig, KeyboardConfig, RandomConfig, QLearningConfig]
@@ -317,7 +318,7 @@ class Config:
                 time_resolution=env.time_resolution,
                 width=env.constants.viewer_width,
                 height=env.constants.viewer_height,
-                num_actions=5, #originally 5
+                num_actions=3, #originally 5
                 num_opponents=len(env.bodies)-1,
                 road_polgon=env.constants.road_map.major_road.static_bounding_box, # GC added
                 pedestrians=[body for body in env.bodies[1:] if isinstance(body, Pedestrian)]

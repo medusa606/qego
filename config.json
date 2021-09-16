@@ -10,10 +10,11 @@
   "terminate_ego_offroad": false,
   "reward_win": 6000.0,
   "reward_draw": 2000.0,
+  "reward_stay_on_road": 5.0,
   "cost_step": 0.4,
   "scenario_config": {
     "option": "pedestrians",
-    "num_pedestrians": 1,
+    "num_pedestrians": 2,
     "outbound_pavement": 1.0,
     "inbound_pavement": 1.0
   },
@@ -22,10 +23,10 @@
     "option": "q-learning",
     "alpha":{
       "start": 0.0008,
-      "stop": 0.0001,
+      "stop": 0.00008 ,
       "num_steps": 10000 },
-    "gamma": 0.5,
-    "epsilon": 0.0,
+    "gamma": 0.5  ,
+    "epsilon": 0.1,
     "feature_config": {
       "distance_x": false,
       "distance_y": false,
@@ -43,7 +44,7 @@
 
   "mode_config": {
     "option": "render",
-    "episode_condition": 500,
+    "episode_condition": 1000,
     "video_dir": "videos"
   }
 }

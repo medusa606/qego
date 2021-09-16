@@ -22,6 +22,7 @@ class Simulation:
         self.reward_monitor = []
         self.weights_plot = []
         self.ego_win_rate = []
+        self.ego_win_draw_rate = []
 
         if self.keyboard_agent is not None:
             assert self.config.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
@@ -51,6 +52,7 @@ class Simulation:
         count = 0
         ego_wins = 0
         ego_win_ratio = 0
+        ego_win_draw_ratio = 0
 
         for episode in range(1, self.config.episodes+1):
             episode_start_time = timeit.default_timer()
@@ -93,6 +95,7 @@ class Simulation:
                 #monitor the win ratio of the ego, regardless of absolute score
                 if win_ego:
                     ego_wins+=1
+                    ego_win_draw_ratio+=1
                     # print("Ego wins = %d" % ego_wins)
                 if count>1:
                     ego_win_ratio = 100*ego_wins/count
