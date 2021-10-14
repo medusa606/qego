@@ -3,7 +3,7 @@
   "episode_log": null,
   "run_log": null,
   "seed": 0,
-  "episodes": 250,
+  "episodes": 10000,
   "max_timesteps": 1000,
   "terminate_collisions": "ego",
   "terminate_ego_zones": true,
@@ -14,7 +14,7 @@
   "cost_step": 0.4,
   "scenario_config": {
     "option": "pedestrians",
-    "num_pedestrians": 2,
+    "num_pedestrians": 1,
     "outbound_pavement": 1.0,
     "inbound_pavement": 1.0
   },
@@ -44,7 +44,7 @@
 
   "mode_config": {
     "option": "render",
-    "episode_condition": 1000,
+    "episode_condition": 10,
     "video_dir": "videos"
   }
 }

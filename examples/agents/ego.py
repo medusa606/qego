@@ -41,11 +41,11 @@ class QLearningEgoAgent(RandomAgent):
         self.opponent_indexes = list(range(1, num_opponents + 1)) # list of the pedestrians
 
         # for just speed control use:
-        # self.available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
+        self.available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
         #for speed and steering control use:
-        self.available_actions = [[throttle_action, steering_action] for throttle_action in np.linspace(start=self.body.constants.min_throttle,
-            stop=self.body.constants.max_throttle, num=num_actions, endpoint=True) for steering_action in np.linspace(start=self.body.constants.min_steering_angle,
-            stop=self.body.constants.max_steering_angle,num=num_actions, endpoint=True)]
+        # self.available_actions = [[throttle_action, steering_action] for throttle_action in np.linspace(start=self.body.constants.min_throttle,
+        #     stop=self.body.constants.max_throttle, num=num_actions, endpoint=True) for steering_action in np.linspace(start=self.body.constants.min_steering_angle,
+        #     stop=self.body.constants.max_steering_angle,num=num_actions, endpoint=True)]
 
         self.log_file = None
         if q_learning_config.log is not None:
@@ -57,7 +57,7 @@ class QLearningEgoAgent(RandomAgent):
         # bounds are used to normalise features
         self.feature_bounds = dict()
 
-        self.feature_bounds["lane_position"] = (0,1)
+        # self.feature_bounds["lane_position"] = (0,1)
 
         self.feature_bounds["safety_binary"] = (0,1)
         # self.feature_bounds["safety_time"] = (0,1)
@@ -65,6 +65,10 @@ class QLearningEgoAgent(RandomAgent):
         # self.feature_bounds["safety_pass_time"] = (0, 1)
 
         self.feature_bounds["goal_distance_x"] = (0,1)
+        # self.feature_bounds["goal_distance_y"] = (0,1)
+        # self.feature_bounds["goal_distance_euc"] = (0,1)
+
+
         # self.feature_bounds["distance_angle"] = (0,1)
         # self.feature_bounds["ego_speed"] = (0,self.body.constants.max_velocity)
         # self.feature_bounds["speed_heading"] = (0,1)
@@ -230,7 +234,14 @@ class QLearningEgoAgent(RandomAgent):
 
         unnormalised_values = dict()
         # unnormalised_values["goal_distance_x"] = (self_state.position.x)/self.width # GC changed to be distance from target position
-        unnormalised_values["goal_distance_x"] = (self.width - self_state.position.x)/self.width # GC changed to be distance from target position
+        rel_width  = (self.width - self_state.position.x)/self.width
+        rel_height = (29 - self_state.position.y)/self.height #center of lane
+        goal_euc = math.sqrt((rel_width**2) + (rel_height**2))
+        unnormalised_values["goal_distance_x"] = rel_width # GC changed to be distance from target position
+        # unnormalised_values["goal_distance_y"] = rel_height
+        # unnormalised_values["goal_distance_euc"] = goal_euc
+        # ic(goal_euc)
+
 
         # *************** distance to ped x relative angle
         # GC This should return a high value if a ped is close and in front of the ego
@@ -429,11 +440,19 @@ class QLearningEgoAgent(RandomAgent):
             unnormalised_values["safe_pass_behind"] = safe_pass_behind
             # unnormalised_values["safety_pass_time"] = safety_pass_time
 
-        lane_position = True
-        if(lane_position):
-            lane_center_y = 29.2
-            unnormalised_values["lane_position"] = 1 - abs(self_state.position.y - opponent_state.position.y)
 
+        #********************************
+        lane_position = False
+        if(lane_position):
+            half_lane_width = 29 # also happens to be absolute y-posn of lane center
+            lane_rel_pos = abs(self_state.position.y - half_lane_width) / half_lane_width
+            unnormalised_values["lane_position"] = 1 - lane_rel_pos
+            if lane_rel_pos > 1:
+                unnormalised_values["lane_position"] = 1 - lane_rel_pos**2
+            # ic(unnormalised_values["lane_position"])
+
+
+        # ********************************
         if self.feature_config.distance_x:
             unnormalised_values["distance_x"] = self_state.position.distance_x(opponent_state.position)
             # ic(unnormalised_values["distance_x"])

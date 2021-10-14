@@ -8,6 +8,7 @@ from gym.utils import seeding
 from config import Mode, CollisionType
 from library.bodies import PelicanCrossing, Pedestrian
 from library.assets import RoadMap, Occlusion
+from icecream import ic
 
 console_logger = logging.getLogger("library.console.environment")
 
@@ -140,10 +141,22 @@ class CAVEnv(MarkovGameEnv):
         #KM edit to improve instant rewards
         ego_relative_distance_to_destination = max(0.0, min(1.0, (self.constants.viewer_width - self.ego.state.position.x) / self.constants.viewer_width))
 
+        #GC edit to penalise ego for leaving the road
+        road_width = 3.65 * 16
+        upper_pavement_bound = 1.0 * road_width
+        lower_pavement_bound = -1.0 * road_width
+        reward_stay_on_road = 0.008
+        not_on_upper_pavement = self.ego.state.position.y < upper_pavement_bound
+        not_on_lower_pavement = self.ego.state.position.y > lower_pavement_bound
+        relative_road_reward = reward_stay_on_road if(not_on_upper_pavement and not_on_lower_pavement) \
+                                                                    else -reward_stay_on_road
+        # ic(not_on_lower_pavement, not_on_upper_pavement, relative_road_reward)
+
         ego_velocity_relative_offset = abs(self.ego.state.velocity - self.ego_maintenance_velocity) / self.ego_max_velocity_offset
         joint_reward[0] -= ego_velocity_relative_offset * self.env_config.cost_step
         # joint_reward[0] -= round(ego_velocity_relative_offset * self.env_config.cost_step)
         joint_reward[0] += (1.0 - ego_relative_distance_to_destination) * self.env_config.cost_step #KM Edit
+        joint_reward[0] += relative_road_reward * self.env_config.cost_step # GC Edit
 
         # print("ego init state velocity %9.3f" % self.ego.init_state.velocity)
         # print("ego state velocity %9.3f" % self.ego.state.velocity)
