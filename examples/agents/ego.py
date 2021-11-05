@@ -14,6 +14,39 @@ from examples.constants import M2PX
 
 from icecream import ic
 
+# Libs For Deep Learning
+import numpy as np
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.optimizers import Adam
+import tensorflow as tf
+from rl.agents import DQNAgent  #discrete action space
+from rl.agents import DDPGAgent #continuous action space
+from rl.policy import BoltzmannQPolicy
+from rl.memory import SequentialMemory
+
+print("TensorFlow version " + tf.__version__)
+
+# the model needs the number of states and actions as input
+# no_states will be == number of features
+no_states = env.observation_space.shape #states shape, eg. (5,)
+no_actions = env.action_space.n #number of actions (discrete), eg. (3)
+def build_model(no_states, no_actions):
+    model = Sequential()
+    #model.add(Flatten(input_shape=(1,states)))
+    model.add(Dense(24, activation='relu'), input_shape=no_states)
+    model.add(Dense(24, activation='relu'))
+    model.add(Dense(actions, activation='linear'))
+    return model
+
+# see https://keras-rl.readthedocs.io/en/latest/agents/overview/
+def build_agent(model, actions):
+    policy = BoltzmannQPolicy()
+    memory = SequentialMemory(limit=50000, window_length=1)
+    dqn = DQNAgent(model=model, memory=memory, policy=policy,
+                  nb_actions=actions, nb_steps_warmup=10, target_model_update=1e-2)
+    return dqn
+
 TARGET_ERROR = 0.000000000000001
 ACTION_ERROR = 0.000000000000001
 
@@ -39,6 +72,12 @@ class QLearningEgoAgent(RandomAgent):
         self.time_resolution = time_resolution
 
         self.opponent_indexes = list(range(1, num_opponents + 1)) # list of the pedestrians
+
+        # dqn ego agent
+        del self.model
+        self.model = build_model(no_states, no_actions)
+        self.dqn = build_agent(model, no_actions)
+        self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
         # for just speed control use:
         self.available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
@@ -136,6 +175,13 @@ class QLearningEgoAgent(RandomAgent):
         if self.log_file:
             labels = [f"{feature}{index}" for index, features in self.enabled_features.items() for feature in features]
             self.log_file.info(f"{','.join(map(str, labels))}")
+
+        # DQN for the ego *************************************
+        # ego_state = state[0] #?????
+        # ego_actions = joint_action[0] #??????
+        # model = build_model(ego_state, ego_actions)
+        # model.summary()
+        # input("press ENTER to continue:")
 
     def reset(self):
         pass
