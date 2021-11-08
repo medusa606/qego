@@ -252,24 +252,24 @@ class QLearningEgoAgent(RandomAgent):
 
 
     def process_feedback(self, previous_state, action, state, reward):
-        difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - self.q_value(previous_state, action)
-        for index, opponent_features in self.features(previous_state, action).items():
-            for feature, feature_value in opponent_features.items():
-                # approximate Q-value update
-                self.feature_weights[index][feature] = self.feature_weights[index][feature] + self.alpha * difference * feature_value
-                # distance = 3.5
-                # relative angle = 9.5
-                # self.feature_weights[index][feature] = 10
-                # ic(self.feature_weights[1]['safety_time'])
-
-        if self.log_file:
-            weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
-            self.log_file.info(f"{','.join(map(str, weights))}")
-
-        self.alpha = next(self.alphas, self.target_alpha)
-        # print("R %6.3f " % reward)
-        # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
-        # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
+        if self.Q_ego_type:
+            difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - self.q_value(previous_state, action)
+            for index, opponent_features in self.features(previous_state, action).items():
+                for feature, feature_value in opponent_features.items():
+                    # approximate Q-value update
+                    self.feature_weights[index][feature] = self.feature_weights[index][feature] + self.alpha * difference * feature_value
+            if self.log_file:
+                weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
+                self.log_file.info(f"{','.join(map(str, weights))}")
+            self.alpha = next(self.alphas, self.target_alpha)
+            # print("R %6.3f " % reward)
+            # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
+            # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
+        if self.DQN_ego_type:
+            state = np.reshape(state, [1, observation_space])
+            dqn_solver.remember(previous_state, action, reward, state, terminal)
+            state = state_next
+            dqn_solver.experience_replay()
 
     def q_value(self, state, action):
         feature_values = self.features(state, action)
