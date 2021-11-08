@@ -10,45 +10,77 @@ from library.bodies import Pedestrian
 from library.bodies import DynamicBodyState
 from library.geometry import Point
 from examples.constants import M2PX
-
-
 from icecream import ic
 
-# Libs For Deep Learning
-import numpy as np
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Flatten
+# import math
+# import random
+# import numpy as np
+# import matplotlib
+# import matplotlib.pyplot as plt
+# from collections import namedtuple, deque
+# from itertools import count
+# import torch
+# import torch.nn as nn
+# import torch.optim as optim
+# import torch.nn.functional as F
+# import torchvision.transforms as T
+
+from collections import deque
+from keras.models import Sequential
+from keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
-from rl.agents import DQNAgent  #discrete action space
-from rl.agents import DDPGAgent #continuous action space
-from rl.policy import BoltzmannQPolicy
-from rl.memory import SequentialMemory
-
-print("TensorFlow version " + tf.__version__)
-
-# the model needs the number of states and actions as input
-# no_states will be == number of features
-no_states = env.observation_space.shape #states shape, eg. (5,)
-no_actions = env.action_space.n #number of actions (discrete), eg. (3)
-def build_model(no_states, no_actions):
-    model = Sequential()
-    #model.add(Flatten(input_shape=(1,states)))
-    model.add(Dense(24, activation='relu'), input_shape=no_states)
-    model.add(Dense(24, activation='relu'))
-    model.add(Dense(actions, activation='linear'))
-    return model
-
-# see https://keras-rl.readthedocs.io/en/latest/agents/overview/
-def build_agent(model, actions):
-    policy = BoltzmannQPolicy()
-    memory = SequentialMemory(limit=50000, window_length=1)
-    dqn = DQNAgent(model=model, memory=memory, policy=policy,
-                  nb_actions=actions, nb_steps_warmup=10, target_model_update=1e-2)
-    return dqn
+gpu_devices = tf.config.experimental.list_physical_devices('GPU')
+for device in gpu_devices:
+    tf.config.experimental.set_memory_growth(device, True)
 
 TARGET_ERROR = 0.000000000000001
 ACTION_ERROR = 0.000000000000001
+
+# For DQN agent
+GAMMA = 0.95
+LEARNING_RATE = 0.001
+MEMORY_SIZE = 1000000
+BATCH_SIZE = 20
+EXPLORATION_MAX = 1.0
+EXPLORATION_MIN = 0.01
+EXPLORATION_DECAY = 0.995
+
+class DQNSolver:
+
+    def __init__(self, observation_space, action_space):
+        self.exploration_rate = EXPLORATION_MAX
+        self.action_space = action_space
+        self.memory = deque(maxlen=MEMORY_SIZE)
+
+        self.model = Sequential()
+        self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
+        self.model.add(Dense(24, activation="relu"))
+        self.model.add(Dense(self.action_space, activation="linear"))
+        self.model.compile(loss="mse", optimizer=Adam(learning_rate=LEARNING_RATE))
+
+    def remember(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
+
+    def act(self, state):
+        if np.random.rand() < self.exploration_rate:
+            return random.randrange(self.action_space)
+        q_values = self.model.predict(state)
+        return np.argmax(q_values[0]), q_values
+
+    def experience_replay(self):
+        if len(self.memory) < BATCH_SIZE:
+            return
+        batch = random.sample(self.memory, BATCH_SIZE)
+        for state, action, reward, state_next, terminal in batch:
+            q_update = reward
+            if not terminal:
+                q_update = (reward + GAMMA * np.amax(self.model.predict(state_next)[0]))
+            q_values = self.model.predict(state)
+            q_values[0][action] = q_update
+            self.model.fit(state, q_values, verbose=0)
+        self.exploration_rate *= EXPLORATION_DECAY
+        self.exploration_rate = max(EXPLORATION_MIN, self.exploration_rate)
 
 
 class QLearningEgoAgent(RandomAgent):
@@ -59,25 +91,16 @@ class QLearningEgoAgent(RandomAgent):
         self.pedestrians = pedestrians
         self.width = width
         self.height = height
-
-
         self.target_alpha = q_learning_config.alpha.stop
         self.alphas = iter(np.linspace(start=q_learning_config.alpha.start, stop=self.target_alpha, num=q_learning_config.alpha.num_steps, endpoint=True))
 
         self.alpha = next(self.alphas, self.target_alpha)  # learning rate (should decrease over time)
         self.gamma = q_learning_config.gamma  # discount factor (should be fixed over time?)
         self.feature_config = q_learning_config.features
-
+        # ic(self.feature_config)
         self.body = body
         self.time_resolution = time_resolution
-
         self.opponent_indexes = list(range(1, num_opponents + 1)) # list of the pedestrians
-
-        # dqn ego agent
-        del self.model
-        self.model = build_model(no_states, no_actions)
-        self.dqn = build_agent(model, no_actions)
-        self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
         # for just speed control use:
         self.available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
@@ -85,6 +108,9 @@ class QLearningEgoAgent(RandomAgent):
         # self.available_actions = [[throttle_action, steering_action] for throttle_action in np.linspace(start=self.body.constants.min_throttle,
         #     stop=self.body.constants.max_throttle, num=num_actions, endpoint=True) for steering_action in np.linspace(start=self.body.constants.min_steering_angle,
         #     stop=self.body.constants.max_steering_angle,num=num_actions, endpoint=True)]
+        ic(self.available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
+        ic(len(self.available_actions))
+
 
         self.log_file = None
         if q_learning_config.log is not None:
@@ -98,10 +124,10 @@ class QLearningEgoAgent(RandomAgent):
 
         # self.feature_bounds["lane_position"] = (0,1)
 
-        self.feature_bounds["safety_binary"] = (0,1)
-        # self.feature_bounds["safety_time"] = (0,1)
-        self.feature_bounds["safe_pass_behind"] = (0, 1)
-        # self.feature_bounds["safety_pass_time"] = (0, 1)
+        # self.feature_bounds["safety_binary"] = (0,1)
+        self.feature_bounds["safety_time"] = (0,1)
+        # self.feature_bounds["safe_pass_behind"] = (0, 1)
+        self.feature_bounds["safety_pass_time"] = (0, 1)
 
         self.feature_bounds["goal_distance_x"] = (0,1)
         # self.feature_bounds["goal_distance_y"] = (0,1)
@@ -176,40 +202,54 @@ class QLearningEgoAgent(RandomAgent):
             labels = [f"{feature}{index}" for index, features in self.enabled_features.items() for feature in features]
             self.log_file.info(f"{','.join(map(str, labels))}")
 
-        # DQN for the ego *************************************
-        # ego_state = state[0] #?????
-        # ego_actions = joint_action[0] #??????
-        # model = build_model(ego_state, ego_actions)
-        # model.summary()
-        # input("press ENTER to continue:")
+
+        # ego agent type
+        self.DQN_ego_type = True
+        if self.DQN_ego_type:
+            ic(len(self.feature_bounds))
+            observation_space = len(self.feature_bounds)
+            action_space = len(self.available_actions)
+            dqn_solver = DQNSolver(observation_space, action_space)
+            self.Q_ego_type = False
+        else:
+            self.Q_ego_type = True
+
+        input("please press ENTER")
 
     def reset(self):
         pass
 
     def choose_action(self, state, action_space, info=None):
-        if self.epsilon_valid():
-            action = self.available_actions[self.np_random.choice(range(len(self.available_actions)))]
-        else:
-            best_actions = list()  # there may be multiple actions with max Q value
-            max_q_value = -math.inf
-            for action in self.available_actions:
-                q_value = self.q_value(state, action)
-                if q_value > max_q_value:
-                    best_actions = [action]
-                    max_q_value = q_value
-                elif q_value == max_q_value:
-                    best_actions.append(action)
-            assert best_actions, "no best action(s) found"
-            # if multiple best actions occur then a random is chosen
-            action = best_actions[0] if len(best_actions) == 1 else best_actions[self.np_random.choice(range(len(best_actions)))]
-            # if len(best_actions) == 1:
-            #     action = best_actions[0] #GC Edit
-            # #store q-values
+
+        if self.Q_ego_type:
+            if self.epsilon_valid():
+                action = self.available_actions[self.np_random.choice(range(len(self.available_actions)))]
+            else:
+                best_actions = list()  # there may be multiple actions with max Q value
+                max_q_value = -math.inf
+                for action in self.available_actions:
+                    q_value = self.q_value(state, action)
+                    if q_value > max_q_value:
+                        best_actions = [action]
+                        max_q_value = q_value
+                    elif q_value == max_q_value:
+                        best_actions.append(action)
+                assert best_actions, "no best action(s) found"
+                # if multiple best actions occur then a random is chosen
+                action = best_actions[0] if len(best_actions) == 1 else best_actions[self.np_random.choice(range(len(best_actions)))]
+                # if len(best_actions) == 1:
+                #     action = best_actions[0] #GC Edit
+                # #store q-values
+                self.store_q_values = q_value
+                self.store_action.append(action[0]) #store ego action history
+                # if action[0] == (-144 or -72):
+                #     ic(action[0])
+            return action
+        if self.DQN_ego_type:
+            action, q_value = dqn_solver.act(state)
             self.store_q_values = q_value
             self.store_action.append(action[0]) #store ego action history
-            # if action[0] == (-144 or -72):
-            #     ic(action[0])
-        return action
+
 
     def process_feedback(self, previous_state, action, state, reward):
         difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - self.q_value(previous_state, action)
