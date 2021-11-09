@@ -77,15 +77,18 @@ def make_config(tester_type, alpha, gamma, epsilon):
 
 
 def run(tester_type, alpha, gamma, epsilon):
+    # set a label to match the params
     label = f"tester={tester_type}, alpha={alpha}, gamma={gamma}, epsilon={epsilon}"
-
     print(f"starting: {label}")
 
+    # this generates a config file for each iterable in the param sweep
     log_dir, config = make_config(tester_type, alpha, gamma, epsilon)
+    # make sure the results you need are being captured here
     config.write_json(f"{log_dir}/config.json")
 
     np_seed, env, agents, keyboard_agent = config.setup()
 
+    # this runs the simulation
     simulation = Simulation(env, agents, config=config, keyboard_agent=keyboard_agent)
     simulation.run()
 
@@ -101,8 +104,8 @@ class PoolParser(ArgumentParser):
             if ivalue < 1:
                 raise ArgumentTypeError(f"invalid positive int value: {value}")
             return ivalue
-
-        self.add_argument("-p", "--processes", type=positive_int, default=10, metavar="N", help="set number of processes as %(metavar)s (default: %(default)s)")
+        # number of default cores set here for pool
+        self.add_argument("-p", "--processes", type=positive_int, default=15, metavar="N", help="set number of processes as %(metavar)s (default: %(default)s)")
 
     def parse_pool(self):
         args = self.parse_args()
@@ -110,6 +113,7 @@ class PoolParser(ArgumentParser):
 
 
 if __name__ == '__main__':
+    # set any type of configuration list here
     # tester_types = [AgentType.RANDOM, AgentType.RANDOM_CONSTRAINED, AgentType.PROXIMITY]
     tester_types = [AgentType.RANDOM_CONSTRAINED]
     alphas = [0.1, 0.5, 0.9]
