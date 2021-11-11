@@ -61,7 +61,6 @@ class Simulation:
             info = self.env.info()
             reward_plot = []
 
-
             self.console.debug(f"state={state}")
 
             for agent in self.agents:
