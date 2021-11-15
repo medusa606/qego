@@ -90,6 +90,9 @@ class QLearningEgoAgent(RandomAgent):
     def __init__(self, q_learning_config, body, pedestrians, time_resolution, num_opponents, num_actions, width, height, road_polgon, **kwargs):
         super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
 
+        # set a mode for taining the qego or operating with trained weights
+        self.USE_TRAINED_WEIGHTS = True
+
         # psuedo-lidar boxes progressively further forward
         self.USE_LIDAR_L1 = False
         self.USE_LIDAR_L2 = True
@@ -100,15 +103,17 @@ class QLearningEgoAgent(RandomAgent):
 
         # monitor if opponent is moving up or down
         self.USE_PED_XDOWN = True
-        self.USE_PED_XUP = False
+        self.USE_PED_XUP = True
 
         # time-to-collision feature based on orthogonal intercept
         self.SAFETY_TIME = False # time to ped collision
-        self.SAFETY_BINARY = False # is 0 if collision expected, 1 if safe
+        self.SAFETY_BINARY = True # is 0 if collision expected, 1 if safe
 
         # opponent outside of speed-cone
         self.SAFETY_PASS_TIME = False #returns positive time if ped passes behind ego
         self.SAFE_PASS_BEHIND = True #returns 1 if ped passes behind ego
+
+        self.trained_weights = [-10.521531851523042, -0.8696111010787829, 0.39068086786190837, 0.39068086786190837, 13.999544380790901, 10.886239197094662]
 
 
         self.road_polgon = road_polgon # GC added
@@ -183,7 +188,7 @@ class QLearningEgoAgent(RandomAgent):
 
         # opponent crossing road up/down?
         if self.USE_PED_XDOWN: self.feature_bounds["ped_xdown"] = (0,1)
-        if self.USE_PED_XUP: self.feature_bounds["ped_xdown"] = (0, 1)
+        if self.USE_PED_XUP: self.feature_bounds["ped_xup"] = (0, 1)
 
         # self.feature_bounds["pedx_lidar_L1"] = (0, 1)
         # self.feature_bounds["pedx_lidar_L2"] = (0, 1)
@@ -216,9 +221,31 @@ class QLearningEgoAgent(RandomAgent):
         if self.feature_config.inverse_distance:
             self.feature_bounds["inverse_distance"] = (0.0, 4.0)
 
-        # set a zero weight for each feature against each opponent
-        self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
-        # ic(self.feature_weights)
+        # # list comprehension
+        # squares = [[(x**2 , y) for x in range(5)] for y in range(3)]
+        # ic(squares)
+        # A=[1,2,3]
+        # B=[4,5,6]
+        # new_dic = [(x+ y) for x,y in zip(A,B)]
+        # ic(new_dic)
+        # new_dic2 = [A[x] + B[x] for x in range(0, len(A))]
+        # ic(new_dic2)
+        # new_dic3 = {A[x] + B[x] for x in range(0, len(A))}
+        # ic(new_dic3)
+        #
+        # #dictionary access
+        # ic(self.feature_bounds.keys())
+        # ic(self.feature_bounds.values())
+        # new_dict4 = [(key, weight) for key,weight in zip(self.feature_bounds.keys(), self.trained_weights)]
+        # ic(new_dict4)
+
+        if not self.USE_TRAINED_WEIGHTS: # set a zero weight for each feature against each opponent
+            self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
+        else: # set the feature weight to the same value across all opponents
+            self.feature_weights = {index: {feature: weight for feature, weight in zip(self.feature_bounds.keys(),self.trained_weights)} for index in
+                                    self.opponent_indexes}
+        ic(self.feature_weights)
+        input()
 
         #store the q-values and actions for monitoring
         self.store_q_values = []
