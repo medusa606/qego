@@ -90,20 +90,26 @@ class QLearningEgoAgent(RandomAgent):
     def __init__(self, q_learning_config, body, pedestrians, time_resolution, num_opponents, num_actions, width, height, road_polgon, **kwargs):
         super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
 
-        # set a mode for taining the qego or operating with trained weights
+        # set a mode for operating with trained weights
         self.USE_TRAINED_WEIGHTS = True
+
+        self.trained = {'goal_distance_x': -13.459852145564263,
+                        'lidar_box_L2': -1.5666005546435373,
+                        'lidar_box_R2': -1.7808028664835929,
+                        'safe_pass_behind': 14.780390773210597,
+                        'safety_binary': 10.782218967939206}
 
         # psuedo-lidar boxes progressively further forward
         self.USE_LIDAR_L1 = False
         self.USE_LIDAR_L2 = True
         self.USE_LIDAR_L3 = False
         self.USE_LIDAR_R1 = False
-        self.USE_LIDAR_R2 = False
+        self.USE_LIDAR_R2 = True
         self.USE_LIDAR_R3 = False
 
         # monitor if opponent is moving up or down
-        self.USE_PED_XDOWN = True
-        self.USE_PED_XUP = True
+        self.USE_PED_XDOWN = False
+        self.USE_PED_XUP = False
 
         # time-to-collision feature based on orthogonal intercept
         self.SAFETY_TIME = False # time to ped collision
@@ -112,9 +118,6 @@ class QLearningEgoAgent(RandomAgent):
         # opponent outside of speed-cone
         self.SAFETY_PASS_TIME = False #returns positive time if ped passes behind ego
         self.SAFE_PASS_BEHIND = True #returns 1 if ped passes behind ego
-
-        self.trained_weights = [-10.521531851523042, -0.8696111010787829, 0.39068086786190837, 0.39068086786190837, 13.999544380790901, 10.886239197094662]
-
 
         self.road_polgon = road_polgon # GC added
         self.pedestrians = pedestrians
@@ -153,7 +156,7 @@ class QLearningEgoAgent(RandomAgent):
         self.feature_bounds["goal_distance_x"] = (0,1) #needed for ego progress
 
         if self.SAFETY_BINARY: self.feature_bounds["safety_binary"] = (0,1)
-        if self.SAFETY_TIME: self.feature_bounds["safety_time"] = (-1000,1000) # may need to adjust this
+        if self.SAFETY_TIME: self.feature_bounds["safety_time"] = (-1000,1000) # may need to adjust range
 
         if self.SAFE_PASS_BEHIND: self.feature_bounds["safe_pass_behind"] = (0, 1)
         if self.SAFETY_PASS_TIME: self.feature_bounds["safety_pass_time"] = (-1000, 1000)
@@ -241,11 +244,11 @@ class QLearningEgoAgent(RandomAgent):
 
         if not self.USE_TRAINED_WEIGHTS: # set a zero weight for each feature against each opponent
             self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
-        else: # set the feature weight to the same value across all opponents
-            self.feature_weights = {index: {feature: weight for feature, weight in zip(self.feature_bounds.keys(),self.trained_weights)} for index in
-                                    self.opponent_indexes}
-        ic(self.feature_weights)
-        input()
+        else: # set the feature weight to the same value across all opponents trained_features
+            self.feature_weights = {index: {feature: weight for feature, weight in zip(self.trained.keys(),
+                                    self.trained.values())} for index in self.opponent_indexes}
+        # ic(self.feature_weights)
+        # input()
 
         #store the q-values and actions for monitoring
         self.store_q_values = []
@@ -309,6 +312,7 @@ class QLearningEgoAgent(RandomAgent):
                 # input()
             return action
         if self.DQN_ego_type:
+            # need to calculate features and pass as state vector here, check shape format
             dqn_action = self.dqn_solver.act(state)
             action = self.available_actions[dqn_action]
             # self.store_q_values = q_value
@@ -322,18 +326,21 @@ class QLearningEgoAgent(RandomAgent):
 
     def process_feedback(self, previous_state, action, state, reward):
         if self.Q_ego_type:
-            difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - self.q_value(previous_state, action)
-            for index, opponent_features in self.features(previous_state, action).items():
-                for feature, feature_value in opponent_features.items():
-                    # approximate Q-value update
-                    self.feature_weights[index][feature] = self.feature_weights[index][feature] + self.alpha * difference * feature_value
-            if self.log_file:
-                weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
-                self.log_file.info(f"{','.join(map(str, weights))}")
-            self.alpha = next(self.alphas, self.target_alpha)
-            # print("R %6.3f " % reward)
-            # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
-            # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
+            if not self.USE_TRAINED_WEIGHTS:
+                difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - self.q_value(previous_state, action)
+                for index, opponent_features in self.features(previous_state, action).items():
+                    for feature, feature_value in opponent_features.items():
+                        # approximate Q-value update
+                        self.feature_weights[index][feature] = self.feature_weights[index][feature] + self.alpha * difference * feature_value
+                if self.log_file:
+                    weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
+                    self.log_file.info(f"{','.join(map(str, weights))}")
+                self.alpha = next(self.alphas, self.target_alpha)
+                # print("R %6.3f " % reward)
+                # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
+                # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
+            else:
+                pass
         if self.DQN_ego_type:
             # TODO add in the features that represent the state
             state = np.reshape(state, [1, observation_space])

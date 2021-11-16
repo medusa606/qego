@@ -195,8 +195,8 @@ class Simulation:
                 plt.legend(labels, fontsize=8, loc='lower left')
 
                 left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
-                score_subplot=True
-                action_subplot=False
+                score_subplot=False
+                action_subplot=True
                 if score_subplot:
                     ax2 = fig.add_axes([left, bottom, width, height])
                     ax2.plot(self.ego_win_rate, color='green')
@@ -224,5 +224,8 @@ class Simulation:
 
         # np.savetxt('episode_rewards_{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()),self.reward_monitor,fmt='%9.3f' )
         # plt.savefig('epi_reward_{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
+
+        # print the features and weights
+        ic(ego.feature_weights)
         ic(ego_win_ratio)
         self.env.close()  # closes viewer rather than environment

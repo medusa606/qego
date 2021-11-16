@@ -3,7 +3,7 @@
   "episode_log": null,
   "run_log": null,
   "seed": 0,
-  "episodes": 10000,
+  "episodes": 50,
   "max_timesteps": 1000,
   "terminate_collisions": "ego",
   "terminate_ego_zones": true,
@@ -36,7 +36,7 @@
       "on_road": false,
       "inverse_distance": false
     },
-    "log": null },
+    "log": "qego_weights" },
 
   "tester_config": {
     "option": "random-constrained",
@@ -44,7 +44,7 @@
 
   "mode_config": {
     "option": "render",
-    "episode_condition": 25,
+    "episode_condition": 1,
     "video_dir": "videos"
   }
 }
