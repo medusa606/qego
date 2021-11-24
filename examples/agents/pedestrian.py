@@ -33,7 +33,7 @@ class CrossingAgent(NoopAgent):
     def choose_action(self, state, action_space, info=None):
         raise NotImplementedError
 
-    def process_feedback(self, previous_state, action, state, reward):
+    def process_feedback(self, previous_state, action, state, reward, done):
         body_state = make_body_state(state, self.index)
 
         if self.waypoint is not None:
@@ -109,8 +109,8 @@ class ElectionAgent(ProximityAgent):
             self.crossing = True
         return action
 
-    def process_feedback(self, previous_state, action, state, reward):
-        super().process_feedback(previous_state, action, state, reward)
+    def process_feedback(self, previous_state, action, state, reward, done):
+        super().process_feedback(previous_state, action, state, reward, done)
 
         if self.waypoint is None and self.target_orientation is None:
             self.crossing = False
@@ -239,7 +239,7 @@ class QLearningAgent(TargetAgent, RandomAgent):
 
         return super().choose_action(state, action_space, info=info)
 
-    def process_feedback(self, previous_state, action, state, reward):  # agent executed action in previous_state, and then arrived in state where it received reward
+    def process_feedback(self, previous_state, action, state, reward, done):  # agent executed action in previous_state, and then arrived in state where it received reward
         target = self.body.target_velocity, self.body.target_orientation
         q_value = self.q_value(previous_state, target)
         difference = (reward + self.gamma * max(self.q_value(state, target_prime) for target_prime in self.available_targets)) - q_value

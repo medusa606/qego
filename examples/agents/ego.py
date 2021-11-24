@@ -265,13 +265,12 @@ class QLearningEgoAgent(RandomAgent):
         # ego agent type
         self.DQN_ego_type = True
         if self.DQN_ego_type:
-            # ic(len(self.feature_bounds))
-            observation_space = len(self.feature_bounds)
+            # flat_state = [item for sublist in state for item in sublist]
+            # observation_space = len(flat_state)
+            self.observation_space = 8 # state space x no_bodies - need to move this to simulation.py so state can be called
             action_space = len(self.available_actions)
-            self.dqn_solver = DQNSolver(observation_space, action_space)
+            self.dqn_solver = DQNSolver(self.observation_space, action_space)
             self.Q_ego_type = False
-            # self.observation_space = observation_space
-            # set scoring here
         else:
             self.Q_ego_type = True
 
@@ -357,13 +356,13 @@ class QLearningEgoAgent(RandomAgent):
             flat_state = [item for sublist in state for item in sublist] # ic(flat_state)
 
             flat_state = np.reshape(flat_state, [1, len(flat_state)])
-            ic(flat_state)
-            input()
-            dqn_solver.remember(previous_state, action, reward, state, done)
-            state = state_next
+            # ic(flat_state)
+            # input()
+            previous_state = np.reshape(previous_state, [1, self.observation_space])
+            self.dqn_solver.remember(previous_state, action, reward, state, done)
             if done:
                 self.score_logger.add_score(step, run)
-            dqn_solver.experience_replay()
+            self.dqn_solver.experience_replay()
 
     def q_value(self, state, action):
         feature_values = self.features(state, action)
