@@ -108,11 +108,12 @@ class Simulation:
                 self.console.debug(f"done={done}")
                 self.console.debug(f"info={info}")
 
+                # for agent, action, reward in zip(self.agents, joint_action, joint_reward):
+                #     agent.process_feedback(previous_state, action, state, reward)
+
                 for agent, action, reward in zip(self.agents, joint_action, joint_reward):
-                    agent.process_feedback(previous_state, action, state, reward)
-                    # ic(agent)
-                    # ic(action)
-                    # ic(reward)
+                    agent.process_feedback(previous_state, action, state, reward, done)
+
 
                 # monitor rewards and feature weights
                 ego = self.agents[0]
@@ -155,60 +156,62 @@ class Simulation:
             self.reward_monitor.append(np.sum(reward_plot)) # monitor the rewards over the episodes
             self.weights_plot.append(list(ego.feature_weights[1].values())) # store the weights for plotting
 
-            if count > 2:
-                s_avg_1d_10 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=10)
-                w_avg_1d_10 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=10)
-                # ic(self.reward_monitor)
-                # ic(avg_1d_10)
-                s_avg_1d_100 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=100)
-                w_avg_1d_100 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=100)
-            if count==1:
-                fig, ax1 = plt.subplots()
-            if count >2:
-                plt.clf()
-                array_width = len(self.weights_plot[0])
-                array_length = len(self.weights_plot)
-                num_plots = array_width
-                # ic(np.shape(np.array(self.reward_monitor)))
-                # ic(array_width,array_length)
-                x = np.arange(array_length)
-                y= self.weights_plot
-                labels = list(ego.enabled_features[1])
+            plot_episode_graph = False
+            if plot_episode_graph:
+                if count > 2:
+                    s_avg_1d_10 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=10)
+                    w_avg_1d_10 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=10)
+                    # ic(self.reward_monitor)
+                    # ic(avg_1d_10)
+                    s_avg_1d_100 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=100)
+                    w_avg_1d_100 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=100)
+                if count==1:
+                    fig, ax1 = plt.subplots()
+                if count >2:
+                    plt.clf()
+                    array_width = len(self.weights_plot[0])
+                    array_length = len(self.weights_plot)
+                    num_plots = array_width
+                    # ic(np.shape(np.array(self.reward_monitor)))
+                    # ic(array_width,array_length)
+                    x = np.arange(array_length)
+                    y= self.weights_plot
+                    labels = list(ego.enabled_features[1])
 
-                # Have a look at the colormaps here and decide which one you'd like:
-                # http://matplotlib.org/1.2.1/examples/pylab_examples/show_colormaps.html
+                    # Have a look at the colormaps here and decide which one you'd like:
+                    # http://matplotlib.org/1.2.1/examples/pylab_examples/show_colormaps.html
 
-                colormap = plt.cm.cool
-                plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.cool(np.linspace(0, 1, num_plots))))
-                for i in range(1, num_plots + 1):
-                    plt.plot(x, y,'o', mfc='none', markersize=3, markeredgewidth=0.5)
-                    if count>10:
-                        plt.plot(w_avg_1d_10, '--')
-                        # if count>100:
-                        #     plt.plot(w_avg_1d_100, 'r:', label='N=100')
-                        #     labels.append('N=100')
-                # if count>10:
-                #     labels.append('N=10')
-                plt.xlabel('Episode')
-                plt.ylabel('Feature Weight')
-                plt.title('Feature Weights: Q-Ego win = %5.1f' % (ego_win_ratio))
-                plt.legend(labels, fontsize=8, loc='lower left')
+                    colormap = plt.cm.cool
+                    plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.cool(np.linspace(0, 1, num_plots))))
+                    for i in range(1, num_plots + 1):
+                        plt.plot(x, y,'o', mfc='none', markersize=3, markeredgewidth=0.5)
+                        if count>10:
+                            plt.plot(w_avg_1d_10, '--')
+                            # if count>100:
+                            #     plt.plot(w_avg_1d_100, 'r:', label='N=100')
+                            #     labels.append('N=100')
+                    # if count>10:
+                    #     labels.append('N=10')
+                    plt.xlabel('Episode')
+                    plt.ylabel('Feature Weight')
+                    plt.title('Feature Weights: Q-Ego win = %5.1f' % (ego_win_ratio))
+                    plt.legend(labels, fontsize=8, loc='lower left')
 
-                left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
-                score_subplot=False
-                action_subplot=True
-                if score_subplot:
-                    ax2 = fig.add_axes([left, bottom, width, height])
-                    ax2.plot(self.ego_win_rate, color='green')
-                    ax2.set_xlabel('win ratio')
-                    ax2.set_xticks([])
-                if action_subplot:
-                    ax2 = fig.add_axes([left, bottom, width, height])
-                    ax2.hist(ego.store_action, color='green')
-                    ax2.set_xlabel('throttle choice')
-                    ax2.set_xticks([])
-                    ax2.set_yticks([])
-                plt.pause(0.01)
+                    left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
+                    score_subplot=True
+                    action_subplot=False
+                    if score_subplot:
+                        ax2 = fig.add_axes([left, bottom, width, height])
+                        ax2.plot(self.ego_win_rate, color='green')
+                        ax2.set_xlabel('win ratio')
+                        ax2.set_xticks([])
+                    if action_subplot:
+                        ax2 = fig.add_axes([left, bottom, width, height])
+                        ax2.hist(ego.store_action, color='green')
+                        ax2.set_xlabel('throttle choice')
+                        ax2.set_xticks([])
+                        ax2.set_yticks([])
+                    plt.pause(0.01)
             count += 1
 
 
@@ -226,6 +229,6 @@ class Simulation:
         # plt.savefig('epi_reward_{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
 
         # print the features and weights
-        ic(ego.feature_weights)
+        # ic(ego.feature_weights)
         ic(ego_win_ratio)
         self.env.close()  # closes viewer rather than environment

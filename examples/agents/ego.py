@@ -91,7 +91,7 @@ class QLearningEgoAgent(RandomAgent):
         super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
 
         # set a mode for operating with trained weights
-        self.USE_TRAINED_WEIGHTS = True
+        self.USE_TRAINED_WEIGHTS = False
 
         self.trained = {'goal_distance_x': -13.459852145564263,
                         'lidar_box_L2': -1.5666005546435373,
@@ -140,8 +140,8 @@ class QLearningEgoAgent(RandomAgent):
         # self.available_actions = [[throttle_action, steering_action] for throttle_action in np.linspace(start=self.body.constants.min_throttle,
         #     stop=self.body.constants.max_throttle, num=num_actions, endpoint=True) for steering_action in np.linspace(start=self.body.constants.min_steering_angle,
         #     stop=self.body.constants.max_steering_angle,num=num_actions, endpoint=True)]
-        ic(self.available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
-        ic(len(self.available_actions))
+        # ic(self.available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
+        # ic(len(self.available_actions))
 
 
         self.log_file = None
@@ -263,13 +263,15 @@ class QLearningEgoAgent(RandomAgent):
 
 
         # ego agent type
-        self.DQN_ego_type = False
+        self.DQN_ego_type = True
         if self.DQN_ego_type:
-            ic(len(self.feature_bounds))
+            # ic(len(self.feature_bounds))
             observation_space = len(self.feature_bounds)
             action_space = len(self.available_actions)
             self.dqn_solver = DQNSolver(observation_space, action_space)
             self.Q_ego_type = False
+            # self.observation_space = observation_space
+            # set scoring here
         else:
             self.Q_ego_type = True
 
@@ -313,18 +315,27 @@ class QLearningEgoAgent(RandomAgent):
             return action
         if self.DQN_ego_type:
             # need to calculate features and pass as state vector here, check shape format
+            # the state here is the position, velocity and orientation for each body
+            # feature_values = self.features(state, action) #returns feature value for each opponent
+            # ic(feature_values)
+            # input("feature values:")
+
             dqn_action = self.dqn_solver.act(state)
             action = self.available_actions[dqn_action]
-            # self.store_q_values = q_value
+
             ic(dqn_action)
             ic(action)
-            ic(type(dqn_action))
-            ic(type(action))
-            input()
-            self.store_action.append(action[0]) #store ego action history
+            # ic(type(dqn_action))
+            # ic(type(action))
+            # input("END of dqn_solver")
+            # self.store_action.append(action[0]) #store ego action history
+            return action
+        else:
+            print("No ego type chose!")
 
 
-    def process_feedback(self, previous_state, action, state, reward):
+    # def process_feedback(self, previous_state, action, state, reward):
+    def process_feedback(self, previous_state, action, state, reward, done):
         if self.Q_ego_type:
             if not self.USE_TRAINED_WEIGHTS:
                 difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - self.q_value(previous_state, action)
@@ -342,10 +353,16 @@ class QLearningEgoAgent(RandomAgent):
             else:
                 pass
         if self.DQN_ego_type:
-            # TODO add in the features that represent the state
-            state = np.reshape(state, [1, observation_space])
-            dqn_solver.remember(previous_state, action, reward, state, terminal)
+            # flatten list for net
+            flat_state = [item for sublist in state for item in sublist] # ic(flat_state)
+
+            flat_state = np.reshape(flat_state, [1, len(flat_state)])
+            ic(flat_state)
+            input()
+            dqn_solver.remember(previous_state, action, reward, state, done)
             state = state_next
+            if done:
+                self.score_logger.add_score(step, run)
             dqn_solver.experience_replay()
 
     def q_value(self, state, action):
