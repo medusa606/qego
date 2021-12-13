@@ -43,6 +43,7 @@ class DQNSolver:
         self.model.add(Dense(24, activation="relu"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(learning_rate=LEARNING_RATE))
+        ic(self.model.summary())
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -87,9 +88,15 @@ class Simulation:
         self.DQN_ego_type = True
         if self.DQN_ego_type:
             self.ego_action_space = self.env.action_space[0].shape[0] # ego action space
-            self.ego_observation_space = self.env.observation_space[0].shape[0]
-            # ic(action_space, observation_space)
-            self.dqn_solver = DQNSolver(self.ego_observation_space, self.ego_action_space)
+            obs = 0 # observation of all agents in environment
+            for index in range(0,len(self.env.observation_space)):
+                obs += self.env.observation_space[index].shape[0]
+            ic(obs)
+            self.obs = obs
+            # self.observation_space = np.array(np.arange(obs)).shape
+            # ic(self.observation_space)
+
+            self.dqn_solver = DQNSolver(obs, self.ego_action_space)
             self.Q_ego_type = False
             self.ego_body = env.bodies[0]
             # self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
@@ -100,8 +107,6 @@ class Simulation:
                 np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=num_actions, endpoint=True)]
             ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             ic(len(self.ego_available_actions))
-
-
         else:
             self.Q_ego_type = True
 
@@ -178,16 +183,12 @@ class Simulation:
                     # ic(ego_action)
                     # now add pedestrian action to joint action space
                     opponent_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents[1:], self.env.action_space)]
-
                     # joint_action = list(zip([ego_action, 0.0], opponent_action))
                     joint_action = opponent_action
-                    joint_action.insert(0,ego_action) #add ego action back to start of the nested list
+                    joint_action.insert(0, ego_action) #add ego action back to start of the nested list
                     # ic(joint_action)
-                    
-                joint_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents, self.env.action_space)]
-                ic(joint_action)
-                # ic(joint_action) [[-144.0, 0.0], [0.0, 0.0]]
-                input()
+                else:
+                    joint_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents, self.env.action_space)]
 
                 if self.election:
                     joint_action = self.election.result(state, joint_action)
@@ -219,8 +220,25 @@ class Simulation:
                 # for agent, action, reward in zip(self.agents, joint_action, joint_reward):
                 #     agent.process_feedback(previous_state, action, state, reward)
 
-                for agent, action, reward in zip(self.agents, joint_action, joint_reward):
-                    agent.process_feedback(previous_state, action, state, reward, done)
+                if self.DQN_ego_type:
+
+                    flat_state = [item for sublist in state for item in sublist]
+                    flat_previous_state = [item for sublist in previous_state for item in sublist]
+                    np_flat_state = np.array(flat_state)
+                    # np_flat_state = np.reshape(flat_state, [1, self.observation_space])
+                    np_flat_state = np.reshape(flat_state, [1, self.obs])
+                    # ic(np_flat_state)
+                    # ic(np_flat_state.shape)
+                    # input()
+                    # solve for each input ...
+                    self.dqn_solver.remember(flat_previous_state, joint_action[0], joint_reward[0], np_flat_state, done)
+                    self.dqn_solver.experience_replay()
+                    # solve for other agents
+                    for agent, action, reward in zip(self.agents[1:], joint_action[1:], joint_reward[1:]):
+                        agent.process_feedback(previous_state, action, state, reward, done)
+                else:
+                    for agent, action, reward in zip(self.agents, joint_action, joint_reward):
+                        agent.process_feedback(previous_state, action, state, reward, done)
 
 
                 # monitor rewards and feature weights
@@ -264,7 +282,7 @@ class Simulation:
             self.reward_monitor.append(np.sum(reward_plot)) # monitor the rewards over the episodes
             self.weights_plot.append(list(ego.feature_weights[1].values())) # store the weights for plotting
 
-            plot_episode_graph = False
+            plot_episode_graph = True
             if plot_episode_graph:
                 if count > 2:
                     s_avg_1d_10 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=10)

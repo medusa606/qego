@@ -167,7 +167,6 @@ class QLearningEgoAgent(RandomAgent):
         # self.feature_bounds["goal_distance_y"] = (0,1)
         # self.feature_bounds["goal_distance_euc"] = (0,1)
 
-
         # self.feature_bounds["distance_angle"] = (0,1)
         # self.feature_bounds["ego_speed"] = (0,self.body.constants.max_velocity)
         # self.feature_bounds["speed_heading"] = (0,1)
@@ -356,7 +355,6 @@ class QLearningEgoAgent(RandomAgent):
         if self.DQN_ego_type:
             # flatten list for net
             flat_state = [item for sublist in state for item in sublist] # ic(flat_state)
-
             flat_state = np.reshape(flat_state, [1, len(flat_state)])
             # ic(flat_state)
             # input()
