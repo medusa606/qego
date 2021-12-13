@@ -89,6 +89,8 @@ ACTION_ERROR = 0.000000000000001
 class QLearningEgoAgent(RandomAgent):
     def __init__(self, q_learning_config, body, pedestrians, time_resolution, num_opponents, num_actions, width, height, road_polgon, **kwargs):
         super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
+        # ic(body.noop_action)
+        # input()
 
         # set a mode for operating with trained weights
         self.USE_TRAINED_WEIGHTS = False

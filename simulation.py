@@ -21,6 +21,7 @@ gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 ic(tf.config.get_visible_devices())
+import random
 
 # For DQN agent
 GAMMA = 0.95
@@ -85,9 +86,22 @@ class Simulation:
 
         self.DQN_ego_type = True
         if self.DQN_ego_type:
-            action_space = self.env.action_space[0].shape[0] # ego action space
-            self.dqn_solver = DQNSolver(self.env.observation_space, action_space)
+            self.ego_action_space = self.env.action_space[0].shape[0] # ego action space
+            self.ego_observation_space = self.env.observation_space[0].shape[0]
+            # ic(action_space, observation_space)
+            self.dqn_solver = DQNSolver(self.ego_observation_space, self.ego_action_space)
             self.Q_ego_type = False
+            self.ego_body = env.bodies[0]
+            # self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
+            #     np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
+            num_actions=3
+            self.noop_action=[0.0, 0.0]
+            self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
+                np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=num_actions, endpoint=True)]
+            ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
+            ic(len(self.ego_available_actions))
+
+
         else:
             self.Q_ego_type = True
 
@@ -146,6 +160,20 @@ class Simulation:
 
             final_timestep = self.config.max_timesteps
             for timestep in range(1, self.config.max_timesteps+1):
+
+                if self.DQN_ego_type:
+                    dqn_action = self.dqn_solver.act(state[0]) #ego state only
+                    ego_action = self.ego_available_actions[dqn_action]
+                    ic(dqn_action)
+                    ic(ego_action)
+                    # now add pedestrian action to joint action space
+                    opponent_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents[1:], self.env.action_space)]
+
+                    joint_action = list(zip(ego_action, opponent_action))
+                    ic(opponent_action)
+                    ic(joint_action)
+                    input()
+
                 joint_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents, self.env.action_space)]
 
                 if self.election:
