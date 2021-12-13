@@ -158,23 +158,36 @@ class Simulation:
                 if self.keyboard_agent is not None and self.env.unwrapped.viewer.window.on_key_press is not self.keyboard_agent.key_press:  # must render before key_press can be assigned
                     self.env.unwrapped.viewer.window.on_key_press = self.keyboard_agent.key_press
 
+            # a=[1,2]
+            # b=[[3,4],[5,6]]
+            # new=[]
+            # new.append(a)
+            # for i in range(len(b)):
+            #     new.append((b[i])) #long method
+            # ic(new)
+            # b.insert(0,a) #easier method
+            # ic(b)
+
             final_timestep = self.config.max_timesteps
             for timestep in range(1, self.config.max_timesteps+1):
 
                 if self.DQN_ego_type:
                     dqn_action = self.dqn_solver.act(state[0]) #ego state only
                     ego_action = self.ego_available_actions[dqn_action]
-                    ic(dqn_action)
-                    ic(ego_action)
+                    # ic(dqn_action)
+                    # ic(ego_action)
                     # now add pedestrian action to joint action space
                     opponent_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents[1:], self.env.action_space)]
 
-                    joint_action = list(zip(ego_action, opponent_action))
-                    ic(opponent_action)
-                    ic(joint_action)
-                    input()
-
+                    # joint_action = list(zip([ego_action, 0.0], opponent_action))
+                    joint_action = opponent_action
+                    joint_action.insert(0,ego_action) #add ego action back to start of the nested list
+                    # ic(joint_action)
+                    
                 joint_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents, self.env.action_space)]
+                ic(joint_action)
+                # ic(joint_action) [[-144.0, 0.0], [0.0, 0.0]]
+                input()
 
                 if self.election:
                     joint_action = self.election.result(state, joint_action)
