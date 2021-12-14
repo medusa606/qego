@@ -61,8 +61,18 @@ class DQNSolver:
         for state, action, reward, state_next, terminal in batch:
             q_update = reward
             if not terminal:
+                ic(reward)
+                ic(GAMMA)
+                ic(state_next)
+                a=self.model.predict(state_next)[0]
+                ic(a)
+
                 q_update = (reward + GAMMA * np.amax(self.model.predict(state_next)[0]))
             q_values = self.model.predict(state)
+            ic(q_values)
+            ic(action)
+            ic(q_values.shape)
+            input()
             q_values[0][action] = q_update
             self.model.fit(state, q_values, verbose=0)
         self.exploration_rate *= EXPLORATION_DECAY
@@ -88,6 +98,9 @@ class Simulation:
         self.DQN_ego_type = True
         if self.DQN_ego_type:
             self.ego_action_space = self.env.action_space[0].shape[0] # ego action space
+            # TODO - need to check this - action space == 2 but should be 3??
+            ic(self.ego_action_space)
+            input()
             obs = 0 # observation of all agents in environment
             for index in range(0,len(self.env.observation_space)):
                 obs += self.env.observation_space[index].shape[0]
@@ -225,13 +238,15 @@ class Simulation:
                     flat_state = [item for sublist in state for item in sublist]
                     flat_previous_state = [item for sublist in previous_state for item in sublist]
                     np_flat_state = np.array(flat_state)
+                    np_flat_previous_state = np.array(flat_previous_state)
                     # np_flat_state = np.reshape(flat_state, [1, self.observation_space])
                     np_flat_state = np.reshape(flat_state, [1, self.obs])
+                    np_flat_previous_state = np.reshape(flat_previous_state, [1, self.obs])
                     # ic(np_flat_state)
                     # ic(np_flat_state.shape)
                     # input()
                     # solve for each input ...
-                    self.dqn_solver.remember(flat_previous_state, joint_action[0], joint_reward[0], np_flat_state, done)
+                    self.dqn_solver.remember(np_flat_previous_state, joint_action[0], joint_reward[0], np_flat_state, done)
                     self.dqn_solver.experience_replay()
                     # solve for other agents
                     for agent, action, reward in zip(self.agents[1:], joint_action[1:], joint_reward[1:]):
