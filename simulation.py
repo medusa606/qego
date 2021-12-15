@@ -75,6 +75,8 @@ class DQNSolver:
             ic(q_values[0])
             ic(q_values.shape)
             ic(action)
+            # discrete action transpose
+            # -1 = -144, 0=0, +1=+144
 
 
             q_values[0][action] = q_update
@@ -95,26 +97,23 @@ class Simulation:
         self.weights_plot = []
         self.ego_win_rate = []
         self.ego_win_draw_rate = []
+        self.ego = self.agents[0] #handle for ego agent
+        self.ego_body = env.bodies[0] #handle for ego body
 
         # ego action space
         # ic(self.env.action_space[0].shape[0])
 
         self.DQN_ego_type = True
         if self.DQN_ego_type:
-            self.ego_action_space = self.env.action_space[0].shape[0] # ego action space
 
-            # # TODO - need to check this - action space == 2 but should be 3??
-            # ic(self.ego_action_space)
-            # ic(type(self.env.action_space))
-            # ic(type(self.env.action_space[0]))
-            # # current action space is 'box' for continuous space
-            # # can switch to 'discrete' for discrete action space
-            # ic(self.env.action_space[0])
-            # ic(self.env.action_space[0].low)
-            # ic(self.env.action_space[0].high)
-            # ic(self.env.action_space[0].shape)
-            # ic(self.env.action_space[0].shape[0])
-            # input()
+            # top-level ego action space (acceleration, steering)
+            # self.ego_action_space = self.env.action_space[0].shape[0]
+
+            # each of these has a discrete number of actions ([-144,0,+144],[-pi/2...])
+            ego_steering_actions = 0 # steering disabled!
+            self.ego_action_space = self.ego.num_actions + ego_steering_actions
+            self.ego_throttle_actions = np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=self.ego.num_actions)
+
 
             obs = 0 # observation of all agents in environment
             for index in range(0,len(self.env.observation_space)):
@@ -126,13 +125,18 @@ class Simulation:
 
             self.dqn_solver = DQNSolver(obs, self.ego_action_space)
             self.Q_ego_type = False
-            self.ego_body = env.bodies[0]
+
+
+            # ic(self.ego.num_actions) # number of ego actions
             # self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
             #     np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
-            num_actions=3
             self.noop_action=[0.0, 0.0]
             self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
-                np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=num_actions, endpoint=True)]
+                np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=self.ego.num_actions, endpoint=True)]
+
+            # ic(throttle_action)
+            # input()
+
             ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             ic(len(self.ego_available_actions))
         else:
@@ -261,6 +265,16 @@ class Simulation:
                     # ic(np_flat_state.shape)
                     # input()
                     # solve for each input ...
+
+
+                    # TODO - should convert throttle actions to index of action list, 0,1,2 --->>>
+                    ic(joint_action[0][0])
+                    ego_action_index  = np.where(self.ego_throttle_actions == joint_action[0][0])
+                    ic(self.ego_throttle_actions)
+                    ic(ego_action_index)
+                    input()
+
+
                     self.dqn_solver.remember(np_flat_previous_state, joint_action[0], joint_reward[0], np_flat_state, done)
                     self.dqn_solver.experience_replay()
                     # solve for other agents
