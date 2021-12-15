@@ -61,18 +61,22 @@ class DQNSolver:
         for state, action, reward, state_next, terminal in batch:
             q_update = reward
             if not terminal:
-                ic(reward)
-                ic(GAMMA)
-                ic(state_next)
                 a=self.model.predict(state_next)[0]
-                ic(a)
+
+                # ic(reward)
+                # ic(GAMMA)
+                # ic(state_next)
+                # ic(a)
 
                 q_update = (reward + GAMMA * np.amax(self.model.predict(state_next)[0]))
             q_values = self.model.predict(state)
+
             ic(q_values)
-            ic(action)
+            ic(q_values[0])
             ic(q_values.shape)
-            input()
+            ic(action)
+
+
             q_values[0][action] = q_update
             self.model.fit(state, q_values, verbose=0)
         self.exploration_rate *= EXPLORATION_DECAY
@@ -98,9 +102,20 @@ class Simulation:
         self.DQN_ego_type = True
         if self.DQN_ego_type:
             self.ego_action_space = self.env.action_space[0].shape[0] # ego action space
-            # TODO - need to check this - action space == 2 but should be 3??
-            ic(self.ego_action_space)
-            input()
+
+            # # TODO - need to check this - action space == 2 but should be 3??
+            # ic(self.ego_action_space)
+            # ic(type(self.env.action_space))
+            # ic(type(self.env.action_space[0]))
+            # # current action space is 'box' for continuous space
+            # # can switch to 'discrete' for discrete action space
+            # ic(self.env.action_space[0])
+            # ic(self.env.action_space[0].low)
+            # ic(self.env.action_space[0].high)
+            # ic(self.env.action_space[0].shape)
+            # ic(self.env.action_space[0].shape[0])
+            # input()
+
             obs = 0 # observation of all agents in environment
             for index in range(0,len(self.env.observation_space)):
                 obs += self.env.observation_space[index].shape[0]
