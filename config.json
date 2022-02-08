@@ -3,7 +3,7 @@
   "episode_log": null,
   "run_log": null,
   "seed": 0,
-  "episodes": 10,
+  "episodes": 50000,
   "max_timesteps": 1000,
   "terminate_collisions": "ego",
   "terminate_ego_zones": true,
@@ -31,12 +31,12 @@
       "distance_x": false,
       "distance_y": false,
       "distance": false,
-      "relative_angle": false,
+      "relative_angle": true,
       "heading": false,
       "on_road": false,
       "inverse_distance": false
     },
-    "log": "qego_weights" },
+    "log": null },
 
   "tester_config": {
     "option": "random-constrained",
@@ -44,7 +44,7 @@
 
   "mode_config": {
     "option": "render",
-    "episode_condition": 100,
+    "episode_condition": 1000,
     "video_dir": "videos"
   }
 }

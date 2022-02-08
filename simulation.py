@@ -18,10 +18,20 @@ from keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
+ic(gpu_devices)
+ic(tf.test.is_built_with_cuda)
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 ic(tf.config.get_visible_devices())
 import random
+
+from keras.callbacks import LambdaCallback
+
+# use this to improve training time for batch learning
+tf.compat.v1.disable_eager_execution()
+
+# set random seed
+tf.random.set_seed(1)
 
 # For DQN agent
 GAMMA = 0.95
@@ -31,26 +41,34 @@ BATCH_SIZE = 20
 EXPLORATION_MAX = 1.0
 EXPLORATION_MIN = 0.01
 EXPLORATION_DECAY = 0.995
+DENSE_NODES = 240#24
+
+# ic.disable()
 
 class DQNSolver:
     def __init__(self, observation_space, action_space):
         self.exploration_rate = EXPLORATION_MAX
-        self.action_space = action_space
+        self.action_space = len(action_space)
+        self.ego_throttle_actions = action_space
         self.memory = deque(maxlen=MEMORY_SIZE)
 
         self.model = Sequential()
-        self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
-        self.model.add(Dense(24, activation="relu"))
+        self.model.add(Dense(DENSE_NODES, input_shape=(observation_space,), activation="relu"))
+        self.model.add(Dense(DENSE_NODES, activation="relu"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(learning_rate=LEARNING_RATE))
         ic(self.model.summary())
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
+        # ic(self.memory)
+        # input()
 
     def act(self, state):
         if np.random.rand() < self.exploration_rate:
             return random.randrange(self.action_space)
+        state = np.reshape(state, [1, 8]) #TODO
+        # ic( state.shape )
         q_values = self.model.predict(state)
         return np.argmax(q_values[0])
 
@@ -62,25 +80,28 @@ class DQNSolver:
             q_update = reward
             if not terminal:
                 a=self.model.predict(state_next)[0]
-
-                # ic(reward)
-                # ic(GAMMA)
-                # ic(state_next)
-                # ic(a)
-
                 q_update = (reward + GAMMA * np.amax(self.model.predict(state_next)[0]))
             q_values = self.model.predict(state)
+            # return the index location of the current action
+            eg_action_index = self.ego_throttle_actions.index(action[0])
+            # ic(eg_action_index)
+            q_values[0][eg_action_index] = q_update
 
-            ic(q_values)
-            ic(q_values[0])
-            ic(q_values.shape)
-            ic(action)
+            # tensorboard to monitor learning
+            # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            # tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+            print_weights = LambdaCallback(on_epoch_end=lambda batch, logs: print(self.model.layers[1].get_weights()))
 
 
-            q_values[0][action] = q_update
             self.model.fit(state, q_values, verbose=0)
+            # self.model.fit(state, q_values, callbacks=[tensorboard_callback], verbose=0) # causes hang
+            # self.model.fit(state, q_values, verbose=0, callbacks = [print_weights])
+
         self.exploration_rate *= EXPLORATION_DECAY
         self.exploration_rate = max(EXPLORATION_MIN, self.exploration_rate)
+
+    def save_model(self):
+        self.model.save('models')
 
 
 
@@ -96,12 +117,13 @@ class Simulation:
         self.ego_win_rate = []
         self.ego_win_draw_rate = []
 
-        # ego action space
-        # ic(self.env.action_space[0].shape[0])
 
         self.DQN_ego_type = True
         if self.DQN_ego_type:
-            self.ego_action_space = self.env.action_space[0].shape[0] # ego action space
+            # The ego discrete velocity actions are defined in config.py line 312
+            # Since we only want to control tis with network, we can ignore steering control
+            # self.ego_action_space = num_actions # self.env.action_space[0].shape[0] # ego action space
+
 
             # # TODO - need to check this - action space == 2 but should be 3??
             # ic(self.ego_action_space)
@@ -116,25 +138,26 @@ class Simulation:
             # ic(self.env.action_space[0].shape[0])
             # input()
 
-            obs = 0 # observation of all agents in environment
+            obs = 0 # observation of all agents, ego + ped(s) in environment
             for index in range(0,len(self.env.observation_space)):
                 obs += self.env.observation_space[index].shape[0]
             ic(obs)
-            self.obs = obs
-            # self.observation_space = np.array(np.arange(obs)).shape
-            # ic(self.observation_space)
+            self.obs = 8 # obs TODO
+            # input()
 
-            self.dqn_solver = DQNSolver(obs, self.ego_action_space)
+            num_actions = 3
             self.Q_ego_type = False
             self.ego_body = env.bodies[0]
-            # self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
-            #     np.linspace(start=self.body.constants.min_throttle, stop=self.body.constants.max_throttle, num=num_actions, endpoint=True)]
-            num_actions=3
             self.noop_action=[0.0, 0.0]
             self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
-                np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=num_actions, endpoint=True)]
-            ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
-            ic(len(self.ego_available_actions))
+                                          np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=num_actions, endpoint=True)]
+
+            #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
+            self.ego_throtle_actions = [self.ego_available_actions[i][0] for i in range(len(self.ego_available_actions))]
+            self.ego_steering_actions = [self.ego_available_actions[i][1] for i in range(len(self.ego_available_actions))]
+            # ic(self.ego_throtle_actions)
+            self.dqn_solver = DQNSolver(obs, self.ego_throtle_actions)
+            # input()
         else:
             self.Q_ego_type = True
 
@@ -205,10 +228,16 @@ class Simulation:
             for timestep in range(1, self.config.max_timesteps+1):
 
                 if self.DQN_ego_type:
-                    dqn_action = self.dqn_solver.act(state[0]) #ego state only
+                    flat_state = [item for sublist in state for item in sublist]
+                    np_flat_state = np.array(flat_state)
+                    # ic(np_flat_state.shape)
+                    # input()
+
+                    dqn_action = self.dqn_solver.act(np_flat_state)
                     ego_action = self.ego_available_actions[dqn_action]
                     # ic(dqn_action)
                     # ic(ego_action)
+                    # input()
                     # now add pedestrian action to joint action space
                     opponent_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents[1:], self.env.action_space)]
                     # joint_action = list(zip([ego_action, 0.0], opponent_action))
@@ -223,6 +252,9 @@ class Simulation:
 
                 previous_state = state
                 state, joint_reward, done, info, win_ego = self.env.step(joint_action)
+                if done:
+                    ic(done, win_ego, joint_reward)
+                    # input()
 
                 # monitor reward development over time
                 reward_plot.append(joint_reward[0])
@@ -261,6 +293,7 @@ class Simulation:
                     # ic(np_flat_state.shape)
                     # input()
                     # solve for each input ...
+                    # ic(joint_reward[0])
                     self.dqn_solver.remember(np_flat_previous_state, joint_action[0], joint_reward[0], np_flat_state, done)
                     self.dqn_solver.experience_replay()
                     # solve for other agents
@@ -301,6 +334,10 @@ class Simulation:
 
             if self.should_render(episode) and not self.should_render(episode+1):
                 self.env.close()  # closes viewer rather than environment
+
+            # save the DQN model
+            if count%10==0:
+                self.dqn_solver.save_model()
 
             episode_end_time = timeit.default_timer()
             episode_results = reporting.analyse_episode(episode, episode_start_time, episode_end_time, final_timestep, info, self.config, self.env)
