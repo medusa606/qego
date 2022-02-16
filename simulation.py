@@ -9,6 +9,8 @@ from scipy.ndimage.filters import uniform_filter1d
 import reporting
 from config import Mode, AgentType
 from examples.election import Election
+from examples.agents.ego import QLearningEgoAgent
+from examples.constants import M2PX
 
 from icecream import ic
 
@@ -26,6 +28,7 @@ ic(tf.config.get_visible_devices())
 import random
 
 from keras.callbacks import LambdaCallback
+
 
 # use this to improve training time for batch learning
 tf.compat.v1.disable_eager_execution()
@@ -124,6 +127,14 @@ class Simulation:
         self.ego = self.agents[0] #handle for ego agent
         self.ego_body = env.bodies[0] #handle for ego body
 
+        self.width = env.constants.viewer_width
+        self.height = env.constants.viewer_height
+        self.M2PX = M2PX
+        ego_body = env.bodies[0]
+        self.min_ego_velocity = ego_body.constants.min_throttle
+        self.max_ego_velocity = ego_body.constants.max_throttle
+        ic(self.max_ego_velocity)
+        input(137)
 
         self.DQN_ego_type = True
         if self.DQN_ego_type:
@@ -192,6 +203,14 @@ class Simulation:
         self.run_file = None
         if self.config.run_log is not None:
             self.run_file = reporting.get_run_file_logger(self.config.run_log)
+
+    def normalise(value, min_bound, max_bound):
+        if value < min_bound:
+            return 0.0
+        elif value > max_bound:
+            return 1.0
+        else:
+            return (value - min_bound) / (max_bound - min_bound)
 
     def should_render(self, episode):
         return self.config.mode_config.mode is Mode.RENDER and episode % self.config.mode_config.episode_condition == 0
@@ -302,7 +321,8 @@ class Simulation:
                     # np_flat_state = np.reshape(flat_state, [1, self.observation_space])
                     np_flat_state = np.reshape(flat_state, [1, self.obs])
                     np_flat_previous_state = np.reshape(flat_previous_state, [1, self.obs])
-                    # ic(np_flat_state)
+                    ic(np_flat_state)
+                    input(320)
                     # ic(np_flat_state.shape)
 
 
