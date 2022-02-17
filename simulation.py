@@ -1,4 +1,5 @@
 import datetime
+import math
 import pathlib
 import timeit
 
@@ -130,11 +131,22 @@ class Simulation:
         self.width = env.constants.viewer_width
         self.height = env.constants.viewer_height
         self.M2PX = M2PX
-        ego_body = env.bodies[0]
-        self.min_ego_velocity = ego_body.constants.min_throttle
-        self.max_ego_velocity = ego_body.constants.max_throttle
-        ic(self.max_ego_velocity)
-        input(137)
+        self.min_ego_throttle = env.bodies[0].constants.min_velocity
+        self.max_ego_throttle = env.bodies[0].constants.max_velocity
+        self.min_ped_velocity = env.bodies[1].constants.min_velocity
+        self.max_ped_velocity = env.bodies[1].constants.max_velocity
+
+        self.norm_limits_ego = {"pos_x": [0, self.width], "pos_y": [0, self.height],
+                                "vel": [self.min_ego_throttle, self.max_ego_throttle],
+                                "ori": [0, 2*math.pi]}
+        self.norm_limits_ped = {"pos_x": [0, self.width], "pos_y": [0, self.height],
+                                "vel": [self.min_ped_velocity, self.max_ped_velocity],
+                                "ori": [0, 2 * math.pi]}
+
+        ic(self.norm_limits_ego)
+        ic(self.norm_limits_ped)
+        input(139)
+
 
         self.DQN_ego_type = True
         if self.DQN_ego_type:
@@ -313,17 +325,19 @@ class Simulation:
                 #     agent.process_feedback(previous_state, action, state, reward)
 
                 if self.DQN_ego_type:
-
+                    # normalise state data (pos_x, pos_y, velocity, orientation)
+                    norm_state = []
+                    # gather state information
                     flat_state = [item for sublist in state for item in sublist]
                     flat_previous_state = [item for sublist in previous_state for item in sublist]
                     np_flat_state = np.array(flat_state)
                     np_flat_previous_state = np.array(flat_previous_state)
-                    # np_flat_state = np.reshape(flat_state, [1, self.observation_space])
                     np_flat_state = np.reshape(flat_state, [1, self.obs])
                     np_flat_previous_state = np.reshape(flat_previous_state, [1, self.obs])
                     ic(np_flat_state)
                     input(320)
                     # ic(np_flat_state.shape)
+
 
 
                     # ic(joint_action[0][0])
