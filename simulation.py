@@ -112,8 +112,6 @@ class DQNSolver:
     def save_model(self):
         self.model.save('models')
 
-
-
 class Simulation:
     def __init__(self, env, agents, config, keyboard_agent):
         assert len(env.bodies) == len(agents), "each body must be assigned an agent and vice versa"
@@ -131,6 +129,7 @@ class Simulation:
         self.width = env.constants.viewer_width
         self.height = env.constants.viewer_height
         self.M2PX = M2PX
+
         self.min_ego_throttle = env.bodies[0].constants.min_velocity
         self.max_ego_throttle = env.bodies[0].constants.max_velocity
         self.min_ped_velocity = env.bodies[1].constants.min_velocity
@@ -273,9 +272,14 @@ class Simulation:
                 # CHOOSE ACTION
                 # ---------------------------------------------
                 if self.DQN_ego_type:
+                    # normalise each agent state (position, orientation, velocity)
+                    # use normalise() based on each variable min/max
+
+                    # flatten list for network input
                     flat_state = [item for sublist in state for item in sublist]
                     np_flat_state = np.array(flat_state)
-                    # ic(np_flat_state.shape)
+                    ic(np_flat_state)
+                    input(262)
 
                     dqn_action = self.dqn_solver.act(np_flat_state)
                     ego_action = self.ego_available_actions[dqn_action]
