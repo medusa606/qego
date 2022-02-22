@@ -136,17 +136,14 @@ class Simulation:
         self.min_ped_velocity = env.bodies[1].constants.min_velocity
         self.max_ped_velocity = env.bodies[1].constants.max_velocity
 
-        self.norm_limits_ego = {"pos_x": [0, self.width], "pos_y": [0, self.height],
-                                "vel": [self.min_ego_throttle, self.max_ego_throttle],
-                                "ori": [0, 2*math.pi]}
-        self.norm_limits_ped = {"pos_x": [0, self.width], "pos_y": [0, self.height],
-                                "vel": [self.min_ped_velocity, self.max_ped_velocity],
-                                "ori": [0, 2 * math.pi]}
+        self.norm_limits = [[0, self.width],[0, self.height],[self.min_ego_throttle, self.max_ego_throttle],[0, 2*math.pi]]
+        norm_limits_ped = [[0, self.width],[0, self.height],[self.min_ped_velocity, self.max_ped_velocity],[0, 2 * math.pi]]
 
-        ic(self.norm_limits_ego)
-        ic(self.norm_limits_ped)
-        input(139)
+        # generate 2D list of low-high norm values for each agent
+        for non_ego_agent in range(len(agents[1:])):
+            [self.norm_limits.append(limit) for limit in norm_limits_ped]
 
+        ic(self.norm_limits)
 
         self.DQN_ego_type = True
         if self.DQN_ego_type:
@@ -216,7 +213,7 @@ class Simulation:
         if self.config.run_log is not None:
             self.run_file = reporting.get_run_file_logger(self.config.run_log)
 
-    def normalise(value, min_bound, max_bound):
+    def normalise(self, value, min_bound, max_bound):
         if value < min_bound:
             return 0.0
         elif value > max_bound:
@@ -272,6 +269,9 @@ class Simulation:
             final_timestep = self.config.max_timesteps
             for timestep in range(1, self.config.max_timesteps+1):
 
+                # ---------------------------------------------
+                # CHOOSE ACTION
+                # ---------------------------------------------
                 if self.DQN_ego_type:
                     flat_state = [item for sublist in state for item in sublist]
                     np_flat_state = np.array(flat_state)
@@ -324,33 +324,42 @@ class Simulation:
                 # for agent, action, reward in zip(self.agents, joint_action, joint_reward):
                 #     agent.process_feedback(previous_state, action, state, reward)
 
+                # ---------------------------------------------
+                # PROCCESS FEEDBACK
+                # ---------------------------------------------
                 if self.DQN_ego_type:
                     # normalise state data (pos_x, pos_y, velocity, orientation)
-                    norm_state = []
-                    # gather state information
                     flat_state = [item for sublist in state for item in sublist]
                     flat_previous_state = [item for sublist in previous_state for item in sublist]
+
                     np_flat_state = np.array(flat_state)
                     np_flat_previous_state = np.array(flat_previous_state)
-                    np_flat_state = np.reshape(flat_state, [1, self.obs])
-                    np_flat_previous_state = np.reshape(flat_previous_state, [1, self.obs])
-                    ic(np_flat_state)
-                    input(320)
-                    # ic(np_flat_state.shape)
+
+                    norm_state = [self.normalise(flat_state[index], *self.norm_limits[index]) for index in range(len(flat_state))]
+                    norm_prev_state = [self.normalise(flat_previous_state[index], *self.norm_limits[index]) for index in range(len(flat_previous_state))]
+
+                    # ic(norm_state)
+                    # ic(norm_prev_state)
+
+                    # np_flat_state = np.reshape(flat_state, [1, self.obs])
+                    # np_flat_previous_state = np.reshape(flat_previous_state, [1, self.obs])
+                    np_flat_state = np.reshape(norm_state, [1, self.obs])
+                    np_flat_previous_state = np.reshape(norm_prev_state, [1, self.obs])
 
 
-
-                    # ic(joint_action[0][0])
-                    ego_action_index  = np.where(self.ego_throttle_actions == joint_action[0][0])
                     # discrete action transpose
                     # -1 = -144, 0=0, +1=+144
+                    ego_action_index  = np.where(self.ego_throttle_actions == joint_action[0][0])
                     ego_action_index  = ego_action_index[0][0] - 1
+
+                    # ic(joint_action[0][0])
                     # ic(self.ego_throttle_actions)
                     # ic(ego_action_index[0][0])
                     # ic(self.ego_throttle_actions[ego_action_index[0][0]])
 
                     self.dqn_solver.remember(np_flat_previous_state, ego_action_index, joint_reward[0], np_flat_state, done)
                     self.dqn_solver.experience_replay()
+
                     # solve for other agents
                     for agent, action, reward in zip(self.agents[1:], joint_action[1:], joint_reward[1:]):
                         agent.process_feedback(previous_state, action, state, reward, done)
