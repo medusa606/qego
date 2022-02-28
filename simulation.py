@@ -42,11 +42,11 @@ random.seed(0)
 GAMMA = 0.95
 LEARNING_RATE = 0.001
 MEMORY_SIZE = 1000000
-BATCH_SIZE = 2
+BATCH_SIZE = 20#50
 EXPLORATION_MAX = 1.0
 EXPLORATION_MIN = 0.01
 EXPLORATION_DECAY = 0.995
-DENSE_NODES = 24#24
+DENSE_NODES = 12#24
 
 # ic.disable()
 
@@ -121,6 +121,7 @@ class Simulation:
         self.keyboard_agent = keyboard_agent
         self.reward_monitor = []
         self.weights_plot = []
+        self.graph_save_episode = 5
         self.ego_win_rate = []
         self.ego_win_draw_rate = []
         self.ego = self.agents[0] #handle for ego agent
@@ -255,16 +256,6 @@ class Simulation:
                 if self.keyboard_agent is not None and self.env.unwrapped.viewer.window.on_key_press is not self.keyboard_agent.key_press:  # must render before key_press can be assigned
                     self.env.unwrapped.viewer.window.on_key_press = self.keyboard_agent.key_press
 
-            # a=[1,2]
-            # b=[[3,4],[5,6]]
-            # new=[]
-            # new.append(a)
-            # for i in range(len(b)):
-            #     new.append((b[i])) #long method
-            # ic(new)
-            # b.insert(0,a) #easier method
-            # ic(b)
-
             final_timestep = self.config.max_timesteps
             for timestep in range(1, self.config.max_timesteps+1):
 
@@ -278,8 +269,8 @@ class Simulation:
                     # flatten list for network input
                     flat_state = [item for sublist in state for item in sublist]
                     np_flat_state = np.array(flat_state)
-                    ic(np_flat_state)
-                    input(262)
+                    # ic(np_flat_state)
+
 
                     dqn_action = self.dqn_solver.act(np_flat_state)
                     ego_action = self.ego_available_actions[dqn_action]
@@ -362,7 +353,8 @@ class Simulation:
                     # ic(self.ego_throttle_actions[ego_action_index[0][0]])
 
                     self.dqn_solver.remember(np_flat_previous_state, ego_action_index, joint_reward[0], np_flat_state, done)
-                    self.dqn_solver.experience_replay()
+                    if count % 20 ==0:
+                        self.dqn_solver.experience_replay()
 
                     # solve for other agents
                     for agent, action, reward in zip(self.agents[1:], joint_action[1:], joint_reward[1:]):
@@ -463,24 +455,30 @@ class Simulation:
                     if not self.DQN_ego_type:
                         plt.legend(labels, fontsize=8, loc='lower left')
 
-                    left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
-                    score_subplot=False
+                    score_subplot=True
                     action_subplot=True
                     if score_subplot:
+                        left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
                         ax2 = fig.add_axes([left, bottom, width, height])
                         ax2.plot(self.ego_win_rate, color='green')
                         ax2.set_xlabel('win ratio')
                         ax2.set_xticks([])
                     if action_subplot:
-                        ax2 = fig.add_axes([left, bottom, width, height])
+                        left, bottom, width, height = [0.18, 0.17, 0.2, 0.2]
+                        ax3 = fig.add_axes([left, bottom, width, height])
                         if self.DQN_ego_type:
-                            ax2.hist(self.dqn_solver.store_action, color='green')
+                            ax3.hist(self.dqn_solver.store_action, color='green')
                         else:
-                            ax2.hist(ego.store_action, color='green')
-                        ax2.set_xlabel('throttle choice')
-                        ax2.set_xticks([])
-                        ax2.set_yticks([])
+                            ax3.hist(ego.store_action, color='green')
+                        ax3.set_xlabel('throttle choice')
+                        ax3.set_xticks([])
+                        ax3.set_yticks([])
                     plt.pause(0.01)
+
+                # save training progress intermittently
+                if count % self.graph_save_episode == 0:
+                    ts = datetime.datetime.now().strftime("%d-%b-%Y-%H-%M-%S")
+                    plt.savefig('plots/Weights_%s.png' % ts)
             count += 1
 
 
