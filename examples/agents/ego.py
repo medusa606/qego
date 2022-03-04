@@ -1,7 +1,5 @@
 import math
-
 import numpy as np
-
 import reporting
 from examples.agents.dynamic_body import make_body_state
 from examples.agents.template import RandomAgent
@@ -11,86 +9,17 @@ from library.bodies import DynamicBodyState
 from library.geometry import Point
 from examples.constants import M2PX
 from icecream import ic
-
-# import math
 import random
-# import numpy as np
-# import matplotlib
-# import matplotlib.pyplot as plt
-# from collections import namedtuple, deque
-# from itertools import count
-# import torch
-# import torch.nn as nn
-# import torch.optim as optim
-# import torch.nn.functional as F
-# import torchvision.transforms as T
-
-# from collections import deque
-# from keras.models import Sequential
-# from keras.layers import Dense
-# from tensorflow.keras.optimizers import Adam
-# import tensorflow as tf
-# gpu_devices = tf.config.experimental.list_physical_devices('GPU')
-# for device in gpu_devices:
-#     tf.config.experimental.set_memory_growth(device, True)
-# ic(tf.config.get_visible_devices())
-
-
 
 TARGET_ERROR = 0.000000000000001
 ACTION_ERROR = 0.000000000000001
 
-# # For DQN agent
-# GAMMA = 0.95
-# LEARNING_RATE = 0.001
-# MEMORY_SIZE = 1000000
-# BATCH_SIZE = 20
-# EXPLORATION_MAX = 1.0
-# EXPLORATION_MIN = 0.01
-# EXPLORATION_DECAY = 0.995
-
-# class DQNSolver:
-#
-#     def __init__(self, observation_space, action_space):
-#         self.exploration_rate = EXPLORATION_MAX
-#         self.action_space = action_space
-#         self.memory = deque(maxlen=MEMORY_SIZE)
-#
-#         self.model = Sequential()
-#         self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
-#         self.model.add(Dense(24, activation="relu"))
-#         self.model.add(Dense(self.action_space, activation="linear"))
-#         self.model.compile(loss="mse", optimizer=Adam(learning_rate=LEARNING_RATE))
-#
-#     def remember(self, state, action, reward, next_state, done):
-#         self.memory.append((state, action, reward, next_state, done))
-#
-#     def act(self, state):
-#         if np.random.rand() < self.exploration_rate:
-#             return random.randrange(self.action_space)
-#         q_values = self.model.predict(state)
-#         return np.argmax(q_values[0])
-#
-#     def experience_replay(self):
-#         if len(self.memory) < BATCH_SIZE:
-#             return
-#         batch = random.sample(self.memory, BATCH_SIZE)
-#         for state, action, reward, state_next, terminal in batch:
-#             q_update = reward
-#             if not terminal:
-#                 q_update = (reward + GAMMA * np.amax(self.model.predict(state_next)[0]))
-#             q_values = self.model.predict(state)
-#             q_values[0][action] = q_update
-#             self.model.fit(state, q_values, verbose=0)
-#         self.exploration_rate *= EXPLORATION_DECAY
-#         self.exploration_rate = max(EXPLORATION_MIN, self.exploration_rate)
-
+# set baseline mode, ego drives max speed
+BASELINE_MODE = True
 
 class QLearningEgoAgent(RandomAgent):
     def __init__(self, q_learning_config, body, pedestrians, time_resolution, num_opponents, num_actions, width, height, road_polgon, **kwargs):
         super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
-        # ic(body.noop_action)
-        # input()
 
         # set a mode for operating with trained weights
         self.USE_TRAINED_WEIGHTS = False
@@ -264,22 +193,18 @@ class QLearningEgoAgent(RandomAgent):
 
 
         # ego agent type
-        self.DQN_ego_type = False
-        if self.DQN_ego_type:
-            # flat_state = [item for sublist in state for item in sublist]
-            # observation_space = len(flat_state)
-            self.observation_space = 8 # state space x no_bodies - need to move this to simulation.py so state can be called
-            action_space = len(self.available_actions)
-            self.dqn_solver = DQNSolver(self.observation_space, action_space)
-            self.Q_ego_type = False
-        else:
-            self.Q_ego_type = True
+        self.Q_ego_type = True
 
     def reset(self):
         pass
 
     def choose_action(self, state, action_space, info=None):
 
+        if BASELINE_MODE:
+            action = self.available_actions[-1]
+            self.store_action.append(action[0])
+            # ic(action[0])
+            return action
         if self.Q_ego_type:
             if self.epsilon_valid():
                 action = self.available_actions[self.np_random.choice(range(len(self.available_actions)))]
@@ -313,30 +238,13 @@ class QLearningEgoAgent(RandomAgent):
                 # ic(type(action))
                 # input()
             return action
-        if self.DQN_ego_type:
-            # need to calculate features and pass as state vector here, check shape format
-            # the state here is the position, velocity and orientation for each body
-            # feature_values = self.features(state, action) #returns feature value for each opponent
-            # ic(feature_values)
-            # input("feature values:")
-
-            dqn_action = self.dqn_solver.act(state)
-            action = self.available_actions[dqn_action]
-
-            ic(dqn_action)
-            ic(action)
-            # ic(type(dqn_action))
-            # ic(type(action))
-            # input("END of dqn_solver")
-            # self.store_action.append(action[0]) #store ego action history
-            return action
         else:
             print("No ego type chose!")
 
 
     # def process_feedback(self, previous_state, action, state, reward):
     def process_feedback(self, previous_state, action, state, reward, done):
-        if self.Q_ego_type:
+        if self.Q_ego_type and not BASELINE_MODE:
             if not self.USE_TRAINED_WEIGHTS:
                 difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - self.q_value(previous_state, action)
                 for index, opponent_features in self.features(previous_state, action).items():
@@ -347,26 +255,13 @@ class QLearningEgoAgent(RandomAgent):
                     weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
                     self.log_file.info(f"{','.join(map(str, weights))}")
                 self.alpha = next(self.alphas, self.target_alpha)
-                # print("R %6.3f " % reward)
-                # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
-                # # print("R %6.3f F %6.3f W %6.3f" % (reward, self.features(state, action), self.feature_weights[0][0]))
             else:
                 pass
-        if self.DQN_ego_type:
-            # flatten list for net
-            flat_state = [item for sublist in state for item in sublist] # ic(flat_state)
-            flat_state = np.reshape(flat_state, [1, len(flat_state)])
-            # ic(flat_state)
-            # input()
-            previous_state = np.reshape(previous_state, [1, self.observation_space])
-            self.dqn_solver.remember(previous_state, action, reward, state, done)
-            if done:
-                self.score_logger.add_score(step, run)
-            self.dqn_solver.experience_replay()
+        else:
+            pass
 
     def q_value(self, state, action):
         feature_values = self.features(state, action)
-        # ic(feature_values)
         q_value = sum(feature_value * self.feature_weights[index][feature] for index, opponent_feature_values in feature_values.items() for feature, feature_value in opponent_feature_values.items())
         return q_value
 

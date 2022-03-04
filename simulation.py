@@ -38,6 +38,9 @@ tf.compat.v1.disable_eager_execution()
 tf.random.set_seed(0)
 random.seed(0)
 
+# set baseline mode, ego drives max speed
+BASELINE_MODE = True
+
 # For DQN agent
 GAMMA = 0.95
 LEARNING_RATE = 0.001
@@ -145,7 +148,14 @@ class Simulation:
 
         ic(self.norm_limits)
 
-        self.DQN_ego_type = True
+        self.ego_body = env.bodies[0]
+        self.noop_action = [0.0, 0.0]
+        num_throttle_actions = 3
+        self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
+                                      np.linspace(start=self.ego_body.constants.min_throttle,
+                                                  stop=self.ego_body.constants.max_throttle, num=num_throttle_actions,
+                                                  endpoint=True)]
+        self.DQN_ego_type = False
         if self.DQN_ego_type:
             # The ego discrete velocity actions are defined in config.py line 312
             # Since we only want to control tis with network, we can ignore steering control
@@ -178,11 +188,7 @@ class Simulation:
             # self.ego_throttle_actions = np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=self.ego.num_actions)
 
             self.Q_ego_type = False
-            self.ego_body = env.bodies[0]
-            self.noop_action=[0.0, 0.0]
-            num_throttle_actions = 3
-            self.ego_available_actions = [[throttle_action, self.noop_action[1]] for throttle_action in
-                                          np.linspace(start=self.ego_body.constants.min_throttle, stop=self.ego_body.constants.max_throttle, num=num_throttle_actions, endpoint=True)]
+
 
             #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             self.ego_throttle_actions = [self.ego_available_actions[i][0] for i in range(len(self.ego_available_actions))]
@@ -262,6 +268,13 @@ class Simulation:
                 # ---------------------------------------------
                 # CHOOSE ACTION
                 # ---------------------------------------------
+                if BASELINE_MODE:
+                    ego_action = self.ego_available_actions[-1]
+                    opponent_action = [agent.choose_action(state, action_space, info) for agent, action_space in
+                                       zip(self.agents[1:], self.env.action_space)]
+                    joint_action = opponent_action
+                    joint_action.insert(0, ego_action)  # add ego action back to start of the nested list
+
                 if self.DQN_ego_type:
                     # normalise each agent state (position, orientation, velocity)
                     # use normalise() based on each variable min/max
@@ -292,8 +305,8 @@ class Simulation:
 
                 previous_state = state
                 state, joint_reward, done, info, win_ego = self.env.step(joint_action)
-                if done:
-                    ic(done, win_ego, joint_reward)
+                # if done:
+                    # ic(done, win_ego, joint_reward)
 
                 # monitor reward development over time
                 reward_plot.append(joint_reward[0])
@@ -322,6 +335,9 @@ class Simulation:
                 # ---------------------------------------------
                 # PROCCESS FEEDBACK
                 # ---------------------------------------------
+                if BASELINE_MODE:
+                    for agent, action, reward in zip(self.agents[1:], joint_action[1:], joint_reward[1:]):
+                        agent.process_feedback(previous_state, action, state, reward, done)
                 if self.DQN_ego_type:
                     # normalise state data (pos_x, pos_y, velocity, orientation)
                     flat_state = [item for sublist in state for item in sublist]
@@ -340,7 +356,6 @@ class Simulation:
                     # np_flat_previous_state = np.reshape(flat_previous_state, [1, self.obs])
                     np_flat_state = np.reshape(norm_state, [1, self.obs])
                     np_flat_previous_state = np.reshape(norm_prev_state, [1, self.obs])
-
 
                     # discrete action transpose
                     # -1 = -144, 0=0, +1=+144
@@ -396,7 +411,7 @@ class Simulation:
                 self.env.close()  # closes viewer rather than environment
 
             # save the DQN model
-            if count%10==0:
+            if self.DQN_ego_type and count%10==0:
                 self.dqn_solver.save_model()
 
             episode_end_time = timeit.default_timer()
@@ -443,7 +458,7 @@ class Simulation:
                     for i in range(1, num_plots + 1):
                         plt.plot(x, y,'o', mfc='none', markersize=3, markeredgewidth=0.5)
                         if count>10:
-                            plt.plot(w_avg_1d_10, '--')
+                            plt.plot(w_avg_1d_10, '--', linewidth=0.1)
                             # if count>100:
                             #     plt.plot(w_avg_1d_100, 'r:', label='N=100')
                             #     labels.append('N=100')
