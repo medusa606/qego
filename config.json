@@ -12,7 +12,7 @@
   "reward_draw": 0.0,
   "reward_stay_on_road": 5.0,
   "cost_step": 5.0,
-  
+
   "scenario_config": {
     "option": "pedestrians",
     "num_pedestrians": 1,
@@ -45,7 +45,7 @@
 
   "mode_config": {
     "option": "render",
-    "episode_condition": 1000,
+    "episode_condition": 100,
     "video_dir": "videos"
   }
 }

@@ -121,6 +121,12 @@ class Simulation:
         self.env = env
         self.agents = agents
         self.config = config
+
+        # view contents of config
+        # from pprint import pprint
+        # pprint(vars(config))
+
+
         self.keyboard_agent = keyboard_agent
         self.reward_monitor = []
         self.weights_plot = []
@@ -155,6 +161,8 @@ class Simulation:
                                       np.linspace(start=self.ego_body.constants.min_throttle,
                                                   stop=self.ego_body.constants.max_throttle, num=num_throttle_actions,
                                                   endpoint=True)]
+
+        self.Q_ego_type = False
         self.DQN_ego_type = False
         if self.DQN_ego_type:
             # The ego discrete velocity actions are defined in config.py line 312
@@ -198,8 +206,8 @@ class Simulation:
             # ic(self.ego_steering_actions)
             # ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             # ic(len(self.ego_available_actions))
-        else:
-            self.Q_ego_type = True
+        # else:
+        #     self.Q_ego_type = True
 
         if self.keyboard_agent is not None:
             assert self.config.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
@@ -425,18 +433,25 @@ class Simulation:
 
             if self.DQN_ego_type:
                 self.weights_plot.append(list( self.dqn_solver.get_model_weights() )) # store the weights for plotting
+            elif self.Q_ego_type:
+                self.weights_plot.append(list(ego.feature_weights[1].values()))  # store the weights for plotting
             else:
-                self.weights_plot.append(list(ego.feature_weights[1].values())) # store the weights for plotting
+                pass
 
-            plot_episode_graph = True
-            if plot_episode_graph:
+            plot_reward = True
+            if plot_reward:
                 if count > 2:
                     s_avg_1d_10 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=10)
-                    w_avg_1d_10 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=10)
+                    if self.DQN_ego_type or self.Q_ego_type:
+                        w_avg_1d_10 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=10)
+                    else:
+                        w_avg_1d_10 = [[0,0,0],[0,0,0]]
+                        self.weights_plot = [[0,0,0],[0,0,0]]
                     # ic(self.reward_monitor)
                     # ic(avg_1d_10)
                     s_avg_1d_100 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=100)
-                    w_avg_1d_100 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=100)
+                    if self.DQN_ego_type or self.Q_ego_type:
+                        w_avg_1d_100 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=100)
                 if count==1:
                     fig, ax1 = plt.subplots()
                 if count >2:
