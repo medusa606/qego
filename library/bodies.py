@@ -264,7 +264,7 @@ class DynamicBody(Body, Occlusion):
                 y=centre_of_rotation.y + diff_x * sin_theta + diff_y * cos_theta
             )
             distance_travelled = self.state.position.distance(successor_position)
-            assert distance_travelled <= distance_velocity + DISTANCE_ERROR, f"{distance_travelled} <= {(distance_velocity + DISTANCE_ERROR)} (v={self.state.velocity}, o={math.degrees(self.steering_angle)})"
+            # assert distance_travelled <= distance_velocity + DISTANCE_ERROR, f"{distance_travelled} <= {(distance_velocity + DISTANCE_ERROR)} (v={self.state.velocity}, o={math.degrees(self.steering_angle)})"
 
             orientation_theta = self.state.orientation + theta
 

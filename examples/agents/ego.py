@@ -22,7 +22,7 @@ class QLearningEgoAgent(RandomAgent):
         super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
 
         # set a mode for operating with trained weights
-        self.USE_TRAINED_WEIGHTS = False
+        self.USE_TRAINED_WEIGHTS = True
 
         self.trained = {'goal_distance_x': -13.459852145564263,
                         'lidar_box_L2': -1.5666005546435373,

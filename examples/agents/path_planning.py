@@ -666,7 +666,7 @@ class FrenetAgent(NoopAgent):
         steering_action = make_steering_action(body_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
         return [throttle_action, steering_action]
 
-    def process_feedback(self, previous_state, action, state, reward):
+    def process_feedback(self, previous_state, action, state, reward, done):
         if self.body.planner_spline:
             body_state = make_body_state(state, self.index)
             waypoint = self.body.planner_spline[0]

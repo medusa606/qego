@@ -17,7 +17,7 @@ class Agent(ABC):
     def choose_action(self, state, action_space, info=None):
         raise NotImplementedError
 
-    def process_feedback(self, previous_state, action, state, reward):
+    def process_feedback(self, previous_state, action, state, reward, done):
         raise NotImplementedError
 
 
@@ -33,7 +33,7 @@ class NoopAgent(Agent):
     def choose_action(self, state, action_space, info=None):
         return self.noop_action
 
-    def process_feedback(self, previous_state, action, state, reward):
+    def process_feedback(self, previous_state, action, state, reward, done):
         pass
 
 
@@ -55,7 +55,7 @@ class RandomAgent(NoopAgent):
             self.action = list(action_space_sample) if isinstance(action_space_sample, np.ndarray) else action_space_sample  # update and store action (so that it can be repeated)
         return self.action
 
-    def process_feedback(self, previous_state, action, state, reward):
+    def process_feedback(self, previous_state, action, state, reward, done):
         pass
 
     def epsilon_valid(self):

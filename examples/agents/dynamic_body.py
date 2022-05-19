@@ -81,7 +81,7 @@ class TargetAgent(NoopAgent):
 
         return [throttle_action, steering_action]
 
-    def process_feedback(self, previous_state, action, state, reward):
+    def process_feedback(self, previous_state, action, state, reward, done):
         body_state = make_body_state(state, self.index)
 
         if self.body.target_velocity is not None:

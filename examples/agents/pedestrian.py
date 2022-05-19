@@ -9,6 +9,8 @@ from examples.targets import TargetOrientation, TargetVelocity
 from library import geometry
 from library.bodies import Pedestrian, Car
 from library.geometry import Point
+from icecream import ic
+import numpy as np
 
 
 class CrossingAgent(NoopAgent):
@@ -125,9 +127,14 @@ class QLearningAgent(TargetAgent, RandomAgent):
 
         self.ego_constants = ego_constants
         self.road_polgon = road_polgon
-        self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
+        # self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
         self.gamma = q_learning_config.gamma  # discount factor (should be fixed over time?)
         self.feature_config = q_learning_config.features
+
+        self.target_alpha = q_learning_config.alpha.stop
+        self.alphas = iter(np.linspace(start=q_learning_config.alpha.start, stop=self.target_alpha,
+                                       num=q_learning_config.alpha.num_steps, endpoint=True))
+        self.alpha = next(self.alphas, self.target_alpha)  # learning rate (should decrease over time)
 
         self.log_file = None
         if q_learning_config.log is not None:
@@ -223,7 +230,20 @@ class QLearningAgent(TargetAgent, RandomAgent):
     def choose_action(self, state, action_space, info=None):
         if self.body.target_velocity is None and self.body.target_orientation is None:
             if self.epsilon_valid():
-                self.body.target_velocity, self.body.target_orientation = self.np_random.choice(self.available_targets)
+                #failing when called...
+                # self.body.target_velocity, self.body.target_orientation = self.np_random.choice(self.available_targets)
+                '''   File "mtrand.pyx", line 904, in numpy.random.mtrand.RandomState.choice
+                ValueError: a must be 1-dimensional'''
+
+                # replaced with this, but hash may not be correct
+                idx = np.random.randint(len(self.available_targets))
+                self.body.target_velocity = self.available_targets[idx][0]
+                self.body.target_orientation = self.available_targets[idx][1]
+                # ic(self.available_targets)
+                # ic(self.body.target_velocity)
+                # ic(self.body.target_orientation)
+                # input()
+
             else:
                 best_targets = list()  # there may be multiple targets with max Q value
                 max_q_value = -math.inf
@@ -244,8 +264,12 @@ class QLearningAgent(TargetAgent, RandomAgent):
         q_value = self.q_value(previous_state, target)
         difference = (reward + self.gamma * max(self.q_value(state, target_prime) for target_prime in self.available_targets)) - q_value
         for feature, feature_value in self.features(previous_state, target).items():
+            # ic(self.alpha)
+            # ic(difference)
+            # ic(feature_value)
+            # input()
             self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * difference * feature_value
-
+            self.alpha = next(self.alphas, self.target_alpha)
         # print(reporting.pretty_float_list(list(self.feature_weights.values())))
 
-        super().process_feedback(previous_state, action, state, reward)
+        super().process_feedback(previous_state, action, state, reward, done)

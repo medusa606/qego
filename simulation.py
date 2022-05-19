@@ -14,6 +14,7 @@ from examples.agents.ego import QLearningEgoAgent
 from examples.constants import M2PX
 
 from icecream import ic
+from pprint import pprint # pprint(vars(object))
 
 from collections import deque
 from keras.models import Sequential
@@ -122,6 +123,25 @@ class Simulation:
         self.env = env
         self.agents = agents
         self.config = config
+
+        # view contents of config
+        # pprint(vars(config))
+        self.ego_type = config.ego_config.agent
+        self.NOOP_EGO, self.Q_EGO = False, False
+
+        # flag different ego type
+        if self.ego_type == AgentType.NOOP:
+            self.NOOP_EGO = True
+            print("noop ego!!!")
+        elif self.ego_type == AgentType.Q_LEARNING:
+            self.Q_EGO = True
+            print("q-learning ego used")
+        else:
+            raise NotImplementedError
+
+
+
+
         self.keyboard_agent = keyboard_agent
         self.reward_monitor = []
         self.weights_plot = []
@@ -147,7 +167,7 @@ class Simulation:
         for non_ego_agent in range(len(agents[1:])):
             [self.norm_limits.append(limit) for limit in norm_limits_ped]
 
-        ic(self.norm_limits)
+        # ic(self.norm_limits)
 
         self.ego_body = env.bodies[0]
         self.noop_action = [0.0, 0.0]
@@ -156,6 +176,8 @@ class Simulation:
                                       np.linspace(start=self.ego_body.constants.min_throttle,
                                                   stop=self.ego_body.constants.max_throttle, num=num_throttle_actions,
                                                   endpoint=True)]
+
+        self.Q_ego_type = False
         self.DQN_ego_type = False
         if self.DQN_ego_type:
             # The ego discrete velocity actions are defined in config.py line 312
@@ -190,7 +212,6 @@ class Simulation:
 
             self.Q_ego_type = False
 
-
             #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             self.ego_throttle_actions = [self.ego_available_actions[i][0] for i in range(len(self.ego_available_actions))]
             self.ego_steering_actions = [self.ego_available_actions[i][1] for i in range(len(self.ego_available_actions))]
@@ -201,8 +222,9 @@ class Simulation:
             # ic(len(self.ego_available_actions))
             # how often to solve the DQN
             self.solver_freq = SOLVER_FREQ
-        else:
-            self.Q_ego_type = True
+        # else:
+        #     self.Q_ego_type = True
+
 
         if self.keyboard_agent is not None:
             assert self.config.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
@@ -382,6 +404,7 @@ class Simulation:
                         agent.process_feedback(previous_state, action, state, reward, done)
 
 
+
                 # monitor rewards and feature weights
                 ego = self.agents[0]
                 # print("R ",  joint_reward[0])
@@ -428,18 +451,25 @@ class Simulation:
 
             if self.DQN_ego_type:
                 self.weights_plot.append(list( self.dqn_solver.get_model_weights() )) # store the weights for plotting
+            elif self.Q_ego_type:
+                self.weights_plot.append(list(ego.feature_weights[1].values()))  # store the weights for plotting
             else:
-                self.weights_plot.append(list(ego.feature_weights[1].values())) # store the weights for plotting
+                pass
 
-            plot_episode_graph = True
-            if plot_episode_graph:
+            plot_reward = True
+            if plot_reward:
                 if count > 2:
                     s_avg_1d_10 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=10)
-                    w_avg_1d_10 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=10)
+                    if self.DQN_ego_type or self.Q_ego_type:
+                        w_avg_1d_10 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=10)
+                    else:
+                        w_avg_1d_10 = [[0],[0]]*count
+                        self.weights_plot = [[0],[0]]*count
                     # ic(self.reward_monitor)
                     # ic(avg_1d_10)
                     s_avg_1d_100 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=100)
-                    w_avg_1d_100 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=100)
+                    if self.DQN_ego_type or self.Q_ego_type:
+                        w_avg_1d_100 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=100)
                 if count==1:
                     fig, ax1 = plt.subplots()
                 if count >2:
@@ -451,7 +481,10 @@ class Simulation:
                     # ic(array_width,array_length)
                     x = np.arange(array_length)
                     y= self.weights_plot
-                    labels = list(ego.enabled_features[1])
+                    if not self.NOOP_EGO:
+                        labels = list(ego.enabled_features[1])
+                    else:
+                        labels = []
 
                     # Have a look at the colormaps here and decide which one you'd like:
                     # http://matplotlib.org/1.2.1/examples/pylab_examples/show_colormaps.html
@@ -469,12 +502,13 @@ class Simulation:
                     #     labels.append('N=10')
                     plt.xlabel('Episode')
                     plt.ylabel('Feature Weight')
-                    plt.title('Feature Weights: Q-Ego win = %5.1f' % (ego_win_ratio))
+                    plt.title('Feature Weights: %s win = %5.1f' % (self.ego_type, ego_win_ratio))
                     if not self.DQN_ego_type:
                         plt.legend(labels, fontsize=8, loc='lower left')
 
                     score_subplot=True
                     action_subplot=True
+
                     if score_subplot:
                         left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
                         ax2 = fig.add_axes([left, bottom, width, height])
@@ -486,8 +520,10 @@ class Simulation:
                         ax3 = fig.add_axes([left, bottom, width, height])
                         if self.DQN_ego_type:
                             ax3.hist(self.dqn_solver.store_action, color='green')
-                        else:
+                        elif self.Q_EGO:
                             ax3.hist(ego.store_action, color='green')
+                        elif self.NOOP_EGO:
+                            ax3.hist(self.noop_action[1], color='green')
                         ax3.set_xlabel('throttle choice')
                         ax3.set_xticks([])
                         ax3.set_yticks([])

@@ -12,7 +12,7 @@
   "reward_draw": 0.0,
   "reward_stay_on_road": 5.0,
   "cost_step": 5.0,
-  
+
   "scenario_config": {
     "option": "pedestrians",
     "num_pedestrians": 1,
@@ -40,8 +40,23 @@
     "log": null },
 
   "tester_config": {
-    "option": "random-constrained",
-    "epsilon": 0.1 },
+    "option": "q-learning",
+    "alpha":{
+      "start": 0.18,
+      "stop": 0.18 ,
+      "num_steps": 10000 },
+    "gamma": 0.87  ,
+    "epsilon": 0.5,
+    "feature_config": {
+      "distance_x": true,
+      "distance_y": true,
+      "distance": true,
+      "relative_angle": false,
+      "heading": false,
+      "on_road": false,
+      "inverse_distance": true
+    },
+    "log": null },
 
   "mode_config": {
     "option": "render",
