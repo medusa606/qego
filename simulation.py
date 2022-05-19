@@ -39,17 +39,18 @@ tf.random.set_seed(0)
 random.seed(0)
 
 # set baseline mode, ego drives max speed
-BASELINE_MODE = True
+BASELINE_MODE = False
 
 # For DQN agent
 GAMMA = 0.95
 LEARNING_RATE = 0.001
 MEMORY_SIZE = 1000000
-BATCH_SIZE = 20#50
+BATCH_SIZE = 50 #50
 EXPLORATION_MAX = 1.0
 EXPLORATION_MIN = 0.01
 EXPLORATION_DECAY = 0.995
-DENSE_NODES = 12#24
+DENSE_NODES = 12 #24
+SOLVER_FREQ = 1 #how often to run dqn solver, 1=every timestep, 20=every 20 steps
 
 # ic.disable()
 
@@ -198,6 +199,8 @@ class Simulation:
             # ic(self.ego_steering_actions)
             # ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             # ic(len(self.ego_available_actions))
+            # how often to solve the DQN
+            self.solver_freq = SOLVER_FREQ
         else:
             self.Q_ego_type = True
 
@@ -368,7 +371,7 @@ class Simulation:
                     # ic(self.ego_throttle_actions[ego_action_index[0][0]])
 
                     self.dqn_solver.remember(np_flat_previous_state, ego_action_index, joint_reward[0], np_flat_state, done)
-                    if count % 20 ==0:
+                    if count % self.solver_freq ==0:
                         self.dqn_solver.experience_replay()
 
                     # solve for other agents
@@ -456,7 +459,7 @@ class Simulation:
                     colormap = plt.cm.cool
                     plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.cool(np.linspace(0, 1, num_plots))))
                     for i in range(1, num_plots + 1):
-                        plt.plot(x, y,'o', mfc='none', markersize=3, markeredgewidth=0.5)
+                        plt.plot(x, y,'o', mfc='none', markersize=1, markeredgewidth=0.5)
                         if count>10:
                             plt.plot(w_avg_1d_10, '--', linewidth=0.1)
                             # if count>100:
