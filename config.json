@@ -60,7 +60,7 @@
 
   "mode_config": {
     "option": "render",
-    "episode_condition": 1000,
+    "episode_condition": 100,
     "video_dir": "videos"
   }
 }

@@ -125,6 +125,7 @@ class Simulation:
         self.config = config
 
         # view contents of config
+<<<<<<< HEAD
         # pprint(vars(config))
         self.ego_type = config.ego_config.agent
         self.NOOP_EGO, self.Q_EGO = False, False
@@ -140,6 +141,10 @@ class Simulation:
             raise NotImplementedError
 
 
+=======
+        # from pprint import pprint
+        # pprint(vars(config))
+>>>>>>> cf26de09b932bc676daf25434e379feb2fce5ebe
 
 
         self.keyboard_agent = keyboard_agent
@@ -220,11 +225,16 @@ class Simulation:
             # ic(self.ego_steering_actions)
             # ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             # ic(len(self.ego_available_actions))
+<<<<<<< HEAD
             # how often to solve the DQN
             self.solver_freq = SOLVER_FREQ
         # else:
         #     self.Q_ego_type = True
 
+=======
+        # else:
+        #     self.Q_ego_type = True
+>>>>>>> cf26de09b932bc676daf25434e379feb2fce5ebe
 
         if self.keyboard_agent is not None:
             assert self.config.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
@@ -465,6 +475,7 @@ class Simulation:
                     else:
                         w_avg_1d_10 = [[0],[0]]*count
                         self.weights_plot = [[0],[0]]*count
+
                     # ic(self.reward_monitor)
                     # ic(avg_1d_10)
                     s_avg_1d_100 = uniform_filter1d(np.ndarray.flatten(np.array(self.reward_monitor)), size=100)
