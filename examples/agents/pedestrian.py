@@ -7,7 +7,7 @@ from examples.agents.template import RandomAgent, NoopAgent
 from examples.constants import M2PX
 from examples.targets import TargetOrientation, TargetVelocity
 from library import geometry
-from library.bodies import Pedestrian, Car
+from library.bodies import Pedestrian, Car, DynamicBodyState
 from library.geometry import Point
 from icecream import ic
 import numpy as np
@@ -130,6 +130,7 @@ class QLearningAgent(TargetAgent, RandomAgent):
         # self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
         self.gamma = q_learning_config.gamma  # discount factor (should be fixed over time?)
         self.feature_config = q_learning_config.features
+        self.opponent_indexes = [0]  # list of the pedestrians
 
         self.target_alpha = q_learning_config.alpha.stop
         self.alphas = iter(np.linspace(start=q_learning_config.alpha.start, stop=self.target_alpha,
@@ -173,7 +174,88 @@ class QLearningAgent(TargetAgent, RandomAgent):
         if self.log_file:
             self.log_file.info(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.enabled_features]))}")
 
+    # def features(self, state, target):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
+    #     ego_state = make_body_state(state, 0)
+    #     self_state = make_body_state(state, self.index)
+    #
+    #     ego_body = Car(ego_state, self.ego_constants)
+    #     self_body = Pedestrian(self_state, self.body.constants)
+    #
+    #     target_velocity, target_orientation = target
+    #
+    #     throttle_action = make_throttle_action(self_state, self.body.constants, self.time_resolution, target_velocity, self.noop_action)
+    #     steering_action = make_steering_action(self_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
+    #
+    #     action = [throttle_action, steering_action]
+    #     joint_action = [ego_body.noop_action, action]
+    #
+    #     spawn_bodies = [ego_body, self_body]
+    #     for i, spawn_body in enumerate(spawn_bodies):
+    #         spawn_body.step(joint_action[i], self.time_resolution)
+    #
+    #     def normalise(value, min_bound, max_bound):
+    #         if value < min_bound:
+    #             return 0
+    #         elif value > max_bound:
+    #             return 1
+    #         else:
+    #             return (value - min_bound) / (max_bound - min_bound)
+    #
+    #     unnormalised_values = dict()
+    #     if self.feature_config.distance_x:
+    #         unnormalised_values["distance_x"] = self_body.state.position.distance_x(ego_body.state.position)
+    #     if self.feature_config.distance_y:
+    #         unnormalised_values["distance_y"] = self_body.state.position.distance_y(ego_body.state.position)
+    #     if self.feature_config.distance:
+    #         unnormalised_values["distance"] = self_body.state.position.distance(ego_body.state.position)
+    #     if self.feature_config.relative_angle:
+    #         unnormalised_values["relative_angle"] = abs(geometry.normalise_angle(geometry.Line(start=self_body.state.position, end=ego_body.state.position).orientation() - self_body.state.orientation))
+    #     if self.feature_config.heading:
+    #         unnormalised_values["heading"] = abs(geometry.normalise_angle(geometry.Line(start=ego_body.state.position, end=self_body.state.position).orientation() - ego_body.state.orientation))
+    #     if self.feature_config.on_road:
+    #         unnormalised_values["on_road"] = 1 if self_body.bounding_box().intersects(self.road_polgon) else 0
+    #     if self.feature_config.inverse_distance:
+    #         x = unnormalised_values["distance"] if "distance" in unnormalised_values else self_body.state.position.distance(ego_body.state.position)
+    #         unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** self.n  # thanks to Ram Varadarajan
+    #
+    #     normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
+    #     return normalised_values
+
+
+
+
+    # ********************************************
+    # Adding look_ahead for pedestrian
+    # ********************************************
+
     def features(self, state, target):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
+
+        def one_step_lookahead(body_state, throttle):  # one-step lookahead with no steering
+            distance_velocity = body_state.velocity * self.time_resolution
+            return DynamicBodyState(
+                position=Point(
+                    x=body_state.position.x + distance_velocity * math.cos(body_state.orientation),
+                    y=body_state.position.y + distance_velocity * math.sin(body_state.orientation)
+                ),
+                velocity=max(self.body.constants.min_velocity, min(self.body.constants.max_velocity, body_state.velocity + (throttle * self.time_resolution))),
+                orientation=body_state.orientation
+            )
+
+        def n_step_lookahead(body_state, throttle, n=50):
+            next_body_state = body_state
+            for _ in range(n):
+                next_body_state = one_step_lookahead(next_body_state, throttle)
+            return next_body_state
+
+        def normalise(value, min_bound, max_bound):
+            if value < min_bound:
+                return 0.0
+            elif value > max_bound:
+                return 1.0
+            else:
+                return (value - min_bound) / (max_bound - min_bound)
+
+
         ego_state = make_body_state(state, 0)
         self_state = make_body_state(state, self.index)
 
@@ -184,6 +266,19 @@ class QLearningAgent(TargetAgent, RandomAgent):
 
         throttle_action = make_throttle_action(self_state, self.body.constants, self.time_resolution, target_velocity, self.noop_action)
         steering_action = make_steering_action(self_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
+
+
+        #******************************
+        # update state by lookahead
+        # ******************************
+        self_state = n_step_lookahead(self_state, throttle_action)
+        ego_state = n_step_lookahead(ego_state, 0.0)
+        ego_body = Car(ego_state, self.ego_constants)
+        self_body = Pedestrian(self_state, self.body.constants)
+        throttle_action = make_throttle_action(self_state, self.body.constants, self.time_resolution, target_velocity,self.noop_action)
+        steering_action = make_steering_action(self_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
+        # ******************************
+
 
         action = [throttle_action, steering_action]
         joint_action = [ego_body.noop_action, action]
@@ -219,6 +314,11 @@ class QLearningAgent(TargetAgent, RandomAgent):
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
         return normalised_values
+
+
+
+
+
 
     def q_value(self, state, target):  # if features do not depend on target, then the Q value will not either
         feature_values = self.features(state, target)

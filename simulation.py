@@ -125,8 +125,7 @@ class Simulation:
         self.config = config
 
         # view contents of config
-<<<<<<< HEAD
-        # pprint(vars(config))
+        pprint(vars(config))
         self.ego_type = config.ego_config.agent
         self.NOOP_EGO, self.Q_EGO = False, False
 
@@ -140,11 +139,10 @@ class Simulation:
         else:
             raise NotImplementedError
 
+        # the tester type
+        self.tester_type = config.tester_config.agent
+        # ic(self.tester_type)
 
-=======
-        # from pprint import pprint
-        # pprint(vars(config))
->>>>>>> cf26de09b932bc676daf25434e379feb2fce5ebe
 
 
         self.keyboard_agent = keyboard_agent
@@ -199,7 +197,6 @@ class Simulation:
             # ic(self.env.action_space[0].high)
             # ic(self.env.action_space[0].shape)
             # ic(self.env.action_space[0].shape[0])
-            # input()
 
             # top-level ego action space (acceleration, steering)
             # self.ego_action_space = self.env.action_space[0].shape[0]
@@ -208,7 +205,6 @@ class Simulation:
                 obs += self.env.observation_space[index].shape[0]
             # ic(obs)
             self.obs = 8 # obs TODO
-            # input()
 
             # each of these has a discrete number of actions ([-144,0,+144],[-pi/2...])
             # ego_steering_actions = 0 # steering disabled!
@@ -225,16 +221,11 @@ class Simulation:
             # ic(self.ego_steering_actions)
             # ic(self.ego_available_actions) #available actions are -144,0,+144 if num_action = 3see config.setup.ego_config
             # ic(len(self.ego_available_actions))
-<<<<<<< HEAD
             # how often to solve the DQN
             self.solver_freq = SOLVER_FREQ
         # else:
         #     self.Q_ego_type = True
 
-=======
-        # else:
-        #     self.Q_ego_type = True
->>>>>>> cf26de09b932bc676daf25434e379feb2fce5ebe
 
         if self.keyboard_agent is not None:
             assert self.config.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
@@ -271,7 +262,9 @@ class Simulation:
         time_plot = []
         count = 0
         ego_wins = 0
+        tester_wins = 0
         ego_win_ratio = 0
+        tester_win_ratio = 0
         ego_win_draw_ratio = 0
 
         for episode in range(1, self.config.episodes+1):
@@ -339,9 +332,12 @@ class Simulation:
                     joint_action = self.election.result(state, joint_action)
 
                 previous_state = state
-                state, joint_reward, done, info, win_ego = self.env.step(joint_action)
-                # if done:
-                    # ic(done, win_ego, joint_reward)
+                # state, joint_reward, done, info, win_ego = self.env.step(joint_action)
+                state, joint_reward, done, info, win_condition = self.env.step(joint_action)
+
+                # UPDATED win_condition = [win_ego, win_tester, terminate]
+                # terminate = draw condition (uninteresting test condition)
+                win_ego, win_tester, terminate = win_condition
 
                 # monitor reward development over time
                 reward_plot.append(joint_reward[0])
@@ -351,11 +347,15 @@ class Simulation:
                 if win_ego:
                     ego_wins+=1
                     ego_win_draw_ratio+=1
-                    # print("Ego wins = %d" % ego_wins)
-                if count>1:
-                    ego_win_ratio = 100*ego_wins/count
-                    self.ego_win_rate.append(ego_win_ratio)
-                    # print("Ego win percentage = %5.1f" % ego_win_ratio)
+                    if count>1:
+                        ego_win_ratio = 100*ego_wins/episode
+                        self.ego_win_rate.append(ego_win_ratio)
+                    assert not win_tester
+                if win_tester:
+                    tester_wins += 1
+                    if count > 1:
+                        tester_win_ratio = 100*tester_wins/episode
+                    assert not win_ego
 
                 self.console.debug(f"timestep={timestep}")
                 self.console.debug(f"action={joint_action}")
@@ -466,6 +466,9 @@ class Simulation:
             else:
                 pass
 
+            # ******************************
+            #  PLOT GRAPH
+            # ******************************
             plot_reward = True
             if plot_reward:
                 if count > 2:
@@ -473,8 +476,10 @@ class Simulation:
                     if self.DQN_ego_type or self.Q_ego_type:
                         w_avg_1d_10 = uniform_filter1d(np.array(self.weights_plot), axis=0, size=10)
                     else:
-                        w_avg_1d_10 = [[0],[0]]*count
-                        self.weights_plot = [[0],[0]]*count
+                        # w_avg_1d_10 = [[0],[0]]*episode
+                        w_avg_1d_10 = [[0]]*episode
+                        # self.weights_plot = [[0],[0]]*episode
+                        self.weights_plot = [[0]]*episode
 
                     # ic(self.reward_monitor)
                     # ic(avg_1d_10)
@@ -513,7 +518,7 @@ class Simulation:
                     #     labels.append('N=10')
                     plt.xlabel('Episode')
                     plt.ylabel('Feature Weight')
-                    plt.title('Feature Weights: %s win = %5.1f' % (self.ego_type, ego_win_ratio))
+                    plt.title(f'Tester: {self.tester_type} (win={tester_win_ratio:.1f}%) Ego: {self.ego_type} (win={ego_win_ratio:.1f}%)')
                     if not self.DQN_ego_type:
                         plt.legend(labels, fontsize=8, loc='lower left')
 
@@ -524,7 +529,7 @@ class Simulation:
                         left, bottom, width, height = [0.67, 0.17, 0.2, 0.2]
                         ax2 = fig.add_axes([left, bottom, width, height])
                         ax2.plot(self.ego_win_rate, color='green')
-                        ax2.set_xlabel('win ratio')
+                        ax2.set_xlabel('ego win ratio')
                         ax2.set_xticks([])
                     if action_subplot:
                         left, bottom, width, height = [0.18, 0.17, 0.2, 0.2]

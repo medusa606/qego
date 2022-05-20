@@ -256,7 +256,8 @@ class CAVEnv(MarkovGameEnv):
             assert not win_ego and win_tester is None
 
         self.current_timestep += 1
-        return state, joint_reward, terminate, info, win_ego
+        win_condition = [win_ego, win_tester, terminate]
+        return state, joint_reward, terminate, info, win_condition
 
     def reset(self):
         for body in self.bodies:

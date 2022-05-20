@@ -239,7 +239,7 @@ class QLearningEgoAgent(RandomAgent):
                 # input()
             return action
         else:
-            print("No ego type chose!")
+            print("No ego type chosen!")
 
 
     # def process_feedback(self, previous_state, action, state, reward):
@@ -286,7 +286,6 @@ class QLearningEgoAgent(RandomAgent):
                 orientation=body_state.orientation
             )
 
-        # *****************************
         def n_step_lookahead(body_state, throttle, n=50):
             next_body_state = body_state
             for _ in range(n):
